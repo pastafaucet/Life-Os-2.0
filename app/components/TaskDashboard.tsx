@@ -106,11 +106,36 @@ export default function TaskDashboard() {
     let workingInput = input.toLowerCase();
     let extractedDateTime = null;
 
-    // Extract #case FIRST to avoid any truncation issues
-    const caseMatch = workingTitle.match(/#([a-zA-Z0-9_-]+)/);
-    if (caseMatch) {
-      parsed.case = caseMatch[1];
-      workingTitle = workingTitle.replace(caseMatch[0], '').trim();
+    console.log('DEBUG: Starting parse of input:', input);
+
+    // Priority keywords that should NOT be treated as cases
+    const priorityKeywords = ['deadline', 'overdue', 'personal', 'today', 'active', 'someday', 'scheduled', 'pinned', 'inbox'];
+    
+    // Extract cases FIRST - support both # and ! syntax, but exclude priority keywords
+    const casePattern = /[#!]([a-zA-Z0-9_-]+)/g;
+    const caseMatches = input.match(casePattern);
+    
+    if (caseMatches) {
+      console.log('DEBUG: Found potential case matches:', caseMatches);
+      
+      for (const match of caseMatches) {
+        const caseName = match.substring(1); // Remove # or !
+        console.log('DEBUG: Checking case candidate:', caseName);
+        
+        // Only treat as case if it's NOT a priority keyword
+        if (!priorityKeywords.includes(caseName.toLowerCase())) {
+          parsed.case = caseName;
+          console.log('DEBUG: Case extracted:', caseName, 'from pattern:', match);
+          
+          // Remove ONLY the exact matched string from both working copies
+          workingTitle = input.replace(match, '').trim();
+          workingInput = workingTitle.toLowerCase();
+          console.log('DEBUG: Working title after case removal:', workingTitle);
+          break; // Take the first valid case
+        } else {
+          console.log('DEBUG: Skipping', caseName, 'because it is a priority keyword');
+        }
+      }
     }
 
     // Extract specific date formats first (MM/DD/YYYY, MM/DD/YY, etc.)
@@ -192,41 +217,41 @@ export default function TaskDashboard() {
     const personMatch = workingTitle.match(/@(\w+)/);
     if (personMatch) {
       parsed.person = personMatch[1].charAt(0).toUpperCase() + personMatch[1].slice(1);
-      workingTitle = workingTitle.replace(/@(\w+)/g, '$1');
+      workingTitle = workingTitle.replace(/@(\w+)/g, '$1').trim();
     }
 
 
-    // Extract priority keywords (case-insensitive with regex)
-    if (/!deadline\b/i.test(input)) {
+    // Extract priority keywords (case-insensitive with regex) - use workingTitle 
+    if (/!deadline\b/i.test(workingTitle)) {
       parsed.priority = "DEADLINE";
-      workingTitle = workingTitle.replace(/!deadline\b/i, '');
-    } else if (/!overdue\b/i.test(input)) {
+      workingTitle = workingTitle.replace(/!deadline\b/i, '').trim();
+    } else if (/!overdue\b/i.test(workingTitle)) {
       parsed.priority = "OVERDUE";
-      workingTitle = workingTitle.replace(/!overdue\b/i, '');
-    } else if (/!personal\b/i.test(input)) {
+      workingTitle = workingTitle.replace(/!overdue\b/i, '').trim();
+    } else if (/!personal\b/i.test(workingTitle)) {
       parsed.priority = "PERSONAL";
-      workingTitle = workingTitle.replace(/!personal\b/i, '');
+      workingTitle = workingTitle.replace(/!personal\b/i, '').trim();
     }
 
-    // Extract status keywords (case-insensitive with regex)
-    if (/!today\b/i.test(input)) {
+    // Extract status keywords (case-insensitive with regex) - use workingTitle
+    if (/!today\b/i.test(workingTitle)) {
       parsed.status = "today";
-      workingTitle = workingTitle.replace(/!today\b/i, '');
-    } else if (/!active\b/i.test(input)) {
+      workingTitle = workingTitle.replace(/!today\b/i, '').trim();
+    } else if (/!active\b/i.test(workingTitle)) {
       parsed.status = "active";
-      workingTitle = workingTitle.replace(/!active\b/i, '');
-    } else if (/!someday\b/i.test(input)) {
+      workingTitle = workingTitle.replace(/!active\b/i, '').trim();
+    } else if (/!someday\b/i.test(workingTitle)) {
       parsed.status = "someday";
-      workingTitle = workingTitle.replace(/!someday\b/i, '');
-    } else if (/!scheduled\b/i.test(input)) {
+      workingTitle = workingTitle.replace(/!someday\b/i, '').trim();
+    } else if (/!scheduled\b/i.test(workingTitle)) {
       parsed.status = "scheduled";
-      workingTitle = workingTitle.replace(/!scheduled\b/i, '');
-    } else if (/!pinned\b/i.test(input)) {
+      workingTitle = workingTitle.replace(/!scheduled\b/i, '').trim();
+    } else if (/!pinned\b/i.test(workingTitle)) {
       parsed.status = "pinned";
-      workingTitle = workingTitle.replace(/!pinned\b/i, '');
-    } else if (/!inbox\b/i.test(input)) {
+      workingTitle = workingTitle.replace(/!pinned\b/i, '').trim();
+    } else if (/!inbox\b/i.test(workingTitle)) {
       parsed.status = "inbox";
-      workingTitle = workingTitle.replace(/!inbox\b/i, '');
+      workingTitle = workingTitle.replace(/!inbox\b/i, '').trim();
     }
 
     // Only set relative dates if no specific date was found
@@ -289,6 +314,7 @@ export default function TaskDashboard() {
     // Clean up title (remove extra spaces) and set final result
     parsed.title = workingTitle.replace(/\s+/g, ' ').trim();
 
+    console.log('DEBUG: Final parsed result:', parsed);
     return parsed;
   };
 
@@ -447,7 +473,10 @@ export default function TaskDashboard() {
       case 'Today':
         return tasks.filter(task => {
           if (task.completed) return false;
-          return task.status === 'today';
+          const taskDate = parseTaskDate(task.doDate);
+          const today = new Date();
+          today.setHours(23, 59, 59, 999); // End of today
+          return taskDate <= today;
         });
       
       case 'Inbox':
@@ -638,7 +667,7 @@ export default function TaskDashboard() {
 
       {/* Natural Language Entry Modal */}
       {showQuickEntry && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center pt-20">
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-start justify-center pt-20">
           <div className="bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl w-full max-w-3xl mx-4">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
