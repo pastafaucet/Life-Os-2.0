@@ -196,37 +196,37 @@ export default function TaskDashboard() {
     }
 
 
-    // Extract priority keywords
-    if (workingInput.includes('!deadline')) {
+    // Extract priority keywords (case-insensitive with regex)
+    if (/!deadline\b/i.test(input)) {
       parsed.priority = "DEADLINE";
-      workingTitle = workingTitle.replace(/!deadline/i, '');
-    } else if (workingInput.includes('!overdue')) {
+      workingTitle = workingTitle.replace(/!deadline\b/i, '');
+    } else if (/!overdue\b/i.test(input)) {
       parsed.priority = "OVERDUE";
-      workingTitle = workingTitle.replace(/!overdue/i, '');
-    } else if (workingInput.includes('!personal')) {
+      workingTitle = workingTitle.replace(/!overdue\b/i, '');
+    } else if (/!personal\b/i.test(input)) {
       parsed.priority = "PERSONAL";
-      workingTitle = workingTitle.replace(/!personal/i, '');
+      workingTitle = workingTitle.replace(/!personal\b/i, '');
     }
 
-    // Extract status keywords
-    if (workingInput.includes('!today')) {
+    // Extract status keywords (case-insensitive with regex)
+    if (/!today\b/i.test(input)) {
       parsed.status = "today";
-      workingTitle = workingTitle.replace(/!today/i, '');
-    } else if (workingInput.includes('!active')) {
+      workingTitle = workingTitle.replace(/!today\b/i, '');
+    } else if (/!active\b/i.test(input)) {
       parsed.status = "active";
-      workingTitle = workingTitle.replace(/!active/i, '');
-    } else if (workingInput.includes('!someday')) {
+      workingTitle = workingTitle.replace(/!active\b/i, '');
+    } else if (/!someday\b/i.test(input)) {
       parsed.status = "someday";
-      workingTitle = workingTitle.replace(/!someday/i, '');
-    } else if (workingInput.includes('!scheduled')) {
+      workingTitle = workingTitle.replace(/!someday\b/i, '');
+    } else if (/!scheduled\b/i.test(input)) {
       parsed.status = "scheduled";
-      workingTitle = workingTitle.replace(/!scheduled/i, '');
-    } else if (workingInput.includes('!pinned')) {
+      workingTitle = workingTitle.replace(/!scheduled\b/i, '');
+    } else if (/!pinned\b/i.test(input)) {
       parsed.status = "pinned";
-      workingTitle = workingTitle.replace(/!pinned/i, '');
-    } else if (workingInput.includes('!inbox')) {
+      workingTitle = workingTitle.replace(/!pinned\b/i, '');
+    } else if (/!inbox\b/i.test(input)) {
       parsed.status = "inbox";
-      workingTitle = workingTitle.replace(/!inbox/i, '');
+      workingTitle = workingTitle.replace(/!inbox\b/i, '');
     }
 
     // Only set relative dates if no specific date was found
