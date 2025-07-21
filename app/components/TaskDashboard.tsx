@@ -318,6 +318,79 @@ export default function TaskDashboard() {
     return parsed;
   };
 
+  // Normalize date to relative terms (Yesterday/Today/Tomorrow) when appropriate
+  const normalizeDate = (dateString: string): string => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Extract time if present
+    const timeMatch = dateString.match(/(\d{1,2}:\d{2}\s*(AM|PM))/i);
+    const timeString = timeMatch ? ` ${timeMatch[1]}` : '';
+    
+    // Try to parse the input date
+    let inputDate: Date | null = null;
+    
+    // Handle specific date formats
+    const dateFormats = [
+      /(\d{1,2})\/(\d{1,2})\/(\d{4})/,  // MM/DD/YYYY
+      /(\d{1,2})\/(\d{1,2})\/(\d{2})/,  // MM/DD/YY
+      /(\d{1,2})-(\d{1,2})-(\d{4})/,   // MM-DD-YYYY
+      /(\d{1,2})-(\d{1,2})-(\d{2})/,   // MM-DD-YY
+      /(\w{3})\s+(\d{1,2}),\s+(\d{4})/i // "Jan 15, 2025"
+    ];
+    
+    for (const format of dateFormats) {
+      const match = dateString.match(format);
+      if (match) {
+        if (format === dateFormats[4]) { // Month name format
+          const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+          const monthName = match[1].toLowerCase();
+          const day = parseInt(match[2]);
+          const year = parseInt(match[3]);
+          const monthIndex = monthNames.indexOf(monthName);
+          if (monthIndex !== -1) {
+            inputDate = new Date(year, monthIndex, day);
+          }
+        } else {
+          const month = parseInt(match[1]);
+          const day = parseInt(match[2]);
+          let year = parseInt(match[3]);
+          
+          // Handle 2-digit years
+          if (year < 100) {
+            year += year < 50 ? 2000 : 1900;
+          }
+          
+          inputDate = new Date(year, month - 1, day);
+        }
+        break;
+      }
+    }
+    
+    // If no specific date format found, return original
+    if (!inputDate || isNaN(inputDate.getTime())) {
+      return dateString;
+    }
+    
+    inputDate.setHours(0, 0, 0, 0);
+    
+    // Convert to relative terms if matching
+    if (inputDate.getTime() === yesterday.getTime()) {
+      return `Yesterday${timeString}`;
+    } else if (inputDate.getTime() === today.getTime()) {
+      return `Today${timeString}`;
+    } else if (inputDate.getTime() === tomorrow.getTime()) {
+      return `Tomorrow${timeString}`;
+    }
+    
+    // Return original if not yesterday/today/tomorrow
+    return dateString;
+  };
+
   const handleInlineEdit = (taskId: number, field: string, value: string) => {
     // Check for @ or # triggers
     if (field === 'case' && value.includes('#')) {
@@ -334,9 +407,17 @@ export default function TaskDashboard() {
       setShowAutocomplete(false);
     }
 
-    setTasks(tasks.map(task => 
-      task.id === taskId ? { ...task, [field]: value } : task
-    ));
+    // Special handling for doDate field - convert to relative dates when appropriate
+    if (field === 'doDate') {
+      const normalizedValue = normalizeDate(value);
+      setTasks(tasks.map(task => 
+        task.id === taskId ? { ...task, [field]: normalizedValue } : task
+      ));
+    } else {
+      setTasks(tasks.map(task => 
+        task.id === taskId ? { ...task, [field]: value } : task
+      ));
+    }
   };
 
   const handleAutocompleteSelect = (item: CaseItem | PersonItem) => {
@@ -394,6 +475,28 @@ export default function TaskDashboard() {
     ));
   };
 
+  // Status change handler
+  const handleStatusChange = (taskId: number, newStatus: 'inbox' | 'active' | 'someday' | 'scheduled' | 'pinned' | 'today') => {
+    setTasks(tasks.map(task => 
+      task.id === taskId ? { ...task, status: newStatus } : task
+    ));
+  };
+
+  // Status button definitions with correct colors
+  const statusButtons = [
+    { status: 'today', label: 'Today', color: 'bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30' },
+    { status: 'inbox', label: 'Inbox', color: 'bg-gray-500/20 text-gray-400 border-gray-500/30 hover:bg-gray-500/30' },
+    { status: 'active', label: 'Active', color: 'bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30' },
+    { status: 'someday', label: 'Someday', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30 hover:bg-orange-500/30' },
+    { status: 'scheduled', label: 'Scheduled', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30 hover:bg-blue-500/30' },
+    { status: 'pinned', label: 'Pinned', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30 hover:bg-purple-500/30' }
+  ];
+
+  // Get available status buttons (exclude current status)
+  const getAvailableStatusButtons = (currentStatus: string) => {
+    return statusButtons.filter(button => button.status !== currentStatus);
+  };
+
   // Drag and drop handlers for calendar
   const handleDragStart = (e: React.DragEvent, task: Task) => {
     setDraggedTask(task);
@@ -409,9 +512,13 @@ export default function TaskDashboard() {
     e.preventDefault();
     if (draggedTask) {
       const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       const today = new Date();
+      today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
+      const nextWeek = new Date(today);
+      nextWeek.setDate(today.getDate() + 7);
       
       let newDoDate = '';
       
@@ -420,12 +527,16 @@ export default function TaskDashboard() {
         newDoDate = 'Today';
       } else if (targetDate.toDateString() === tomorrow.toDateString()) {
         newDoDate = 'Tomorrow';
-      } else {
+      } else if (targetDate <= nextWeek) {
+        // Within the next week - use day name
         newDoDate = dayNames[targetDate.getDay()];
+      } else {
+        // Beyond next week - use specific date format
+        newDoDate = `${monthNames[targetDate.getMonth()]} ${targetDate.getDate()}, ${targetDate.getFullYear()}`;
       }
       
       // Preserve time if it exists
-      const timeMatch = draggedTask.doDate.match(/(\d{1,2}:\d{2}\s*(AM|PM))/i);
+      const timeMatch = draggedTask.doDate.match(/(\\d{1,2}:\\d{2}\\s*(AM|PM))/i);
       if (timeMatch) {
         newDoDate += ` ${timeMatch[1]}`;
       }
@@ -449,6 +560,19 @@ export default function TaskDashboard() {
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
       return tomorrow;
+    }
+    
+    // Handle specific date formats like "Aug 15, 2025" or "Dec 3, 2025"
+    const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    const specificDateMatch = doDate.match(/(\w{3})\s+(\d{1,2}),\s+(\d{4})/i);
+    if (specificDateMatch) {
+      const monthName = specificDateMatch[1].toLowerCase();
+      const day = parseInt(specificDateMatch[2]);
+      const year = parseInt(specificDateMatch[3]);
+      const monthIndex = monthNames.indexOf(monthName);
+      if (monthIndex !== -1) {
+        return new Date(year, monthIndex, day);
+      }
     }
     
     // Handle day names
@@ -855,7 +979,7 @@ export default function TaskDashboard() {
                   <span className="text-xl">{typeIcons[task.type]}</span>
                   
                   {/* Inline editable title */}
-                  <div className="flex-1">
+                  <div className="flex-1 relative">
                     {editingTaskId === task.id && editingField === 'title' ? (
                       <input
                         type="text"
@@ -875,16 +999,35 @@ export default function TaskDashboard() {
                         autoFocus
                       />
                     ) : (
-                      <p 
-                        className="font-medium text-white text-lg hover:text-gray-300 transition-colors cursor-pointer"
-                        onDoubleClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          handleQuickEdit(task.id, 'title');
-                        }}
-                      >
-                        {task.title}
-                      </p>
+                      <div className="flex items-center">
+                        <p 
+                          className="font-medium text-white text-lg hover:text-gray-300 transition-colors cursor-pointer"
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            handleQuickEdit(task.id, 'title');
+                          }}
+                        >
+                          {task.title}
+                        </p>
+                        
+                        {/* Hover Status Change Buttons */}
+                        <div className="ml-4 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {getAvailableStatusButtons(task.status).map((statusButton) => (
+                            <button
+                              key={statusButton.status}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStatusChange(task.id, statusButton.status as 'inbox' | 'active' | 'someday' | 'scheduled' | 'pinned' | 'today');
+                              }}
+                              className={`px-2 py-0.5 rounded text-xs font-medium border transition-all ${statusButton.color}`}
+                              title={`Move to ${statusButton.label}`}
+                            >
+                              {statusButton.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     )}
                     
                     <div className="flex items-center space-x-4 mt-2">
