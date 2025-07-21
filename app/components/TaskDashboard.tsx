@@ -649,6 +649,47 @@ export default function TaskDashboard() {
 
   const filteredTasks = getFilteredTasks();
 
+  // Count tasks for each view
+  const getTaskCount = (viewName: string) => {
+    switch (viewName) {
+      case 'Today':
+        return tasks.filter(task => {
+          if (task.completed) return false;
+          const taskDate = parseTaskDate(task.doDate);
+          const today = new Date();
+          today.setHours(23, 59, 59, 999);
+          return taskDate <= today;
+        }).length;
+      
+      case 'Inbox':
+        return tasks.filter(task => !task.completed && task.status === 'inbox').length;
+      
+      case 'Active':
+        return tasks.filter(task => !task.completed && task.status === 'active').length;
+      
+      case 'Someday':
+        return tasks.filter(task => !task.completed && task.status === 'someday').length;
+      
+      case 'Scheduled':
+        return tasks.filter(task => !task.completed && task.status === 'scheduled').length;
+      
+      case 'Pinned':
+        return tasks.filter(task => !task.completed && task.status === 'pinned').length;
+      
+      case 'All':
+        return tasks.filter(task => !task.completed).length;
+      
+      case 'Done':
+        return tasks.filter(task => task.completed).length;
+      
+      case 'Calendar':
+        return tasks.filter(task => !task.completed).length;
+      
+      default:
+        return 0;
+    }
+  };
+
   const priorityStyles: Record<string, string> = {
     'DEADLINE': 'bg-red-500/20 text-red-400 border-red-500/30',
     'OVERDUE': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
@@ -744,12 +785,12 @@ export default function TaskDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
-      {/* Command Bar */}
-      <div className="border-b border-gray-800/50 backdrop-blur-xl bg-gray-900/50 sticky top-0 z-40">
+      {/* Task Management Header */}
+      <div className="border-b border-gray-800/50 backdrop-blur-xl bg-gray-900/50 sticky top-16 z-30">
         <div className="max-w-[1400px] mx-auto px-6">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center space-x-3">
-              <h1 className="text-lg font-semibold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">Life OS</h1>
+              <h1 className="text-lg font-semibold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">Task Management</h1>
               
               {/* AI Status Indicator */}
               {aiStatusLoaded && (
@@ -836,7 +877,7 @@ export default function TaskDashboard() {
                     : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
                 }`}
               >
-                {view}
+                {view} ({getTaskCount(view)})
               </button>
             ))}
           </div>

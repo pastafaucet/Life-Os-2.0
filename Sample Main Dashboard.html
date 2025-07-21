@@ -1,0 +1,1586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life OS - Complete System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #141414;
+            --bg-tertiary: #1a1a1a;
+            --bg-hover: #242424;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --text-tertiary: #707070;
+            --accent-primary: #0071e3;
+            --accent-secondary: #30d158;
+            --accent-danger: #ff453a;
+            --accent-warning: #ffd60a;
+            --accent-purple: #bf5af2;
+            --accent-orange: #ff9f0a;
+            --accent-teal: #64d2ff;
+            --border-color: #2a2a2a;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            overflow-x: hidden;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-hover);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-tertiary);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 240px;
+            height: 100vh;
+            background-color: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            z-index: 100;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            background-color: var(--bg-secondary);
+            z-index: 10;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .nav-section {
+            padding: 8px 0;
+        }
+
+        .nav-section-title {
+            padding: 4px 20px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 20px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.2s ease;
+            position: relative;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .nav-item:hover {
+            color: var(--text-primary);
+            background-color: var(--bg-hover);
+        }
+
+        .nav-item.active {
+            color: var(--text-primary);
+            background-color: var(--bg-tertiary);
+        }
+
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background-color: var(--accent-primary);
+        }
+
+        .nav-icon {
+            width: 18px;
+            height: 18px;
+            opacity: 0.8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 240px;
+            min-height: 100vh;
+            background-color: var(--bg-primary);
+        }
+
+        /* Header */
+        .header {
+            position: sticky;
+            top: 0;
+            background-color: rgba(10, 10, 10, 0.8);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            z-index: 50;
+            padding: 12px 24px;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .page-title {
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .page-subtitle {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: none;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #0051d5;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--bg-hover);
+        }
+
+        .btn-ghost {
+            background-color: transparent;
+            color: var(--text-secondary);
+            padding: 6px 10px;
+        }
+
+        .btn-ghost:hover {
+            color: var(--text-primary);
+        }
+
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 12px;
+        }
+
+        /* Page Container */
+        .page-container {
+            padding: 20px 24px;
+        }
+
+        /* Page Sections */
+        .page-section {
+            display: none;
+        }
+
+        .page-section.active {
+            display: block;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+            border-color: var(--accent-primary);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .stat-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .stat-value {
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            line-height: 1;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+
+        .stat-change {
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .stat-change.positive {
+            color: var(--accent-secondary);
+        }
+
+        .stat-change.negative {
+            color: var(--accent-danger);
+        }
+
+        /* Content Grid */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 20px;
+        }
+
+        .content-grid.single {
+            grid-template-columns: 1fr;
+        }
+
+        /* Cards */
+        .card {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* Lists */
+        .list-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .list-item:last-child {
+            border-bottom: none;
+        }
+
+        .list-item:hover {
+            padding-left: 8px;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: var(--text-secondary);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 8px 12px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            background-color: var(--bg-hover);
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 8px 12px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .form-textarea {
+            width: 100%;
+            padding: 8px 12px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        /* Tags */
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            background-color: var(--bg-hover);
+            color: var(--text-secondary);
+            margin-right: 4px;
+        }
+
+        .tag.primary {
+            background-color: rgba(0, 113, 227, 0.2);
+            color: var(--accent-primary);
+        }
+
+        .tag.success {
+            background-color: rgba(48, 209, 88, 0.2);
+            color: var(--accent-secondary);
+        }
+
+        .tag.warning {
+            background-color: rgba(255, 214, 10, 0.2);
+            color: var(--accent-warning);
+        }
+
+        .tag.danger {
+            background-color: rgba(255, 69, 58, 0.2);
+            color: var(--accent-danger);
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: var(--bg-tertiary);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: var(--accent-primary);
+            transition: width 0.3s ease;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background-color: var(--bg-tertiary);
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .modal-close:hover {
+            background-color: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* Charts Placeholder */
+        .chart-container {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-tertiary);
+            margin-bottom: 20px;
+        }
+
+        /* Tables */
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table th {
+            text-align: left;
+            padding: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .table td {
+            padding: 12px;
+            font-size: 14px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .table tr:hover {
+            background-color: var(--bg-hover);
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .quick-action-card {
+            background-color: var(--bg-secondary);
+            border-radius: 10px;
+            padding: 16px;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .quick-action-card:hover {
+            background-color: var(--bg-hover);
+            border-color: var(--accent-primary);
+            transform: translateY(-1px);
+        }
+
+        .quick-action-icon {
+            font-size: 24px;
+            margin-bottom: 6px;
+        }
+
+        .quick-action-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* Mobile Menu Toggle */
+        .mobile-menu-toggle {
+            display: none;
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 200;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 6px;
+            cursor: pointer;
+        }
+
+        /* Task Columns */
+        .kanban-board {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .kanban-column {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid var(--border-color);
+        }
+
+        .kanban-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .kanban-title {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .kanban-count {
+            font-size: 13px;
+            color: var(--text-tertiary);
+        }
+
+        .task-card {
+            background-color: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid var(--border-color);
+        }
+
+        .task-card:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+            border-color: var(--accent-primary);
+        }
+
+        /* Health Metrics */
+        .health-metric {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            background-color: var(--bg-tertiary);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .metric-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .metric-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .metric-details h4 {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+
+        .metric-details p {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .metric-value {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* Finance Cards */
+        .finance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .finance-card {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+
+        .finance-card:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        .finance-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 12px;
+        }
+
+        .finance-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .finance-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .kanban-board {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .mobile-menu-toggle {
+                display: block;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .quick-actions {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            .finance-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header-actions .btn-secondary {
+                display: none;
+            }
+        }
+
+        /* Loading State */
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--text-tertiary);
+            border-radius: 50%;
+            border-top-color: var(--accent-primary);
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Utility Classes */
+        .mt-1 { margin-top: 8px; }
+        .mt-2 { margin-top: 16px; }
+        .mt-3 { margin-top: 24px; }
+        .mb-1 { margin-bottom: 8px; }
+        .mb-2 { margin-bottom: 16px; }
+        .mb-3 { margin-bottom: 24px; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-muted { color: var(--text-secondary); }
+        .text-small { font-size: 12px; }
+        .font-semibold { font-weight: 600; }
+        .flex { display: flex; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-1 { gap: 8px; }
+        .gap-2 { gap: 16px; }
+        .gap-3 { gap: 24px; }
+    </style>
+</head>
+<body>
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-menu-toggle" onclick="toggleSidebar()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+    </button>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">🧠</div>
+                <span>Life OS</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Core</div>
+                <div class="nav-item active" onclick="navigateTo('dashboard')">
+                    <span class="nav-icon">📊</span>
+                    <span>Dashboard</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('tasks')">
+                    <span class="nav-icon">✓</span>
+                    <span>Tasks & Projects</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('knowledge')">
+                    <span class="nav-icon">🧠</span>
+                    <span>Knowledge Base</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('reviews')">
+                    <span class="nav-icon">📝</span>
+                    <span>Reviews</span>
+                </div>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Professional</div>
+                <div class="nav-item" onclick="navigateTo('legal')">
+                    <span class="nav-icon">⚖️</span>
+                    <span>Legal Cases</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('contacts')">
+                    <span class="nav-icon">👥</span>
+                    <span>Contacts</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('research')">
+                    <span class="nav-icon">📚</span>
+                    <span>Legal Research</span>
+                </div>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Financial</div>
+                <div class="nav-item" onclick="navigateTo('networth')">
+                    <span class="nav-icon">💎</span>
+                    <span>Net Worth</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('budget')">
+                    <span class="nav-icon">💳</span>
+                    <span>Budget & Expenses</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('investments')">
+                    <span class="nav-icon">📈</span>
+                    <span>Investments</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('planning')">
+                    <span class="nav-icon">🎯</span>
+                    <span>Financial Planning</span>
+                </div>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Health & Wellness</div>
+                <div class="nav-item" onclick="navigateTo('fitness')">
+                    <span class="nav-icon">💪</span>
+                    <span>Fitness</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('metrics')">
+                    <span class="nav-icon">📊</span>
+                    <span>Body Metrics</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('nutrition')">
+                    <span class="nav-icon">🍎</span>
+                    <span>Nutrition</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('habits')">
+                    <span class="nav-icon">🧘</span>
+                    <span>Habits & Wellness</span>
+                </div>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Life Management</div>
+                <div class="nav-item" onclick="navigateTo('household')">
+                    <span class="nav-icon">🏠</span>
+                    <span>Household</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('entertainment')">
+                    <span class="nav-icon">🎮</span>
+                    <span>Entertainment</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('travel')">
+                    <span class="nav-icon">✈️</span>
+                    <span>Travel</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('learning')">
+                    <span class="nav-icon">🎓</span>
+                    <span>Learning</span>
+                </div>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Intelligence</div>
+                <div class="nav-item" onclick="navigateTo('ai')">
+                    <span class="nav-icon">🤖</span>
+                    <span>AI Assistant</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('analytics')">
+                    <span class="nav-icon">📊</span>
+                    <span>Analytics</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('automation')">
+                    <span class="nav-icon">⚡</span>
+                    <span>Automation</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('mobile')">
+                    <span class="nav-icon">📱</span>
+                    <span>Mobile</span>
+                </div>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Integration</div>
+                <div class="nav-item" onclick="navigateTo('calendar')">
+                    <span class="nav-icon">📅</span>
+                    <span>Calendar</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('communication')">
+                    <span class="nav-icon">📧</span>
+                    <span>Communication</span>
+                </div>
+                <div class="nav-item" onclick="navigateTo('integrations')">
+                    <span class="nav-icon">🔗</span>
+                    <span>External Services</span>
+                </div>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div>
+                        <h1 class="page-title" id="pageTitle">Dashboard</h1>
+                        <p class="page-subtitle" id="pageSubtitle">Welcome back! Here's your life at a glance.</p>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-ghost" onclick="showNotifications()">
+                        <span>🔔</span>
+                    </button>
+                    <button class="btn btn-secondary">
+                        <span>🔍</span>
+                        <span>Search</span>
+                    </button>
+                    <button class="btn btn-primary" onclick="showQuickAdd()">
+                        <span>+</span>
+                        <span>Quick Add</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dashboard Section -->
+        <div class="page-section active" id="dashboardSection">
+            <div class="page-container">
+                <!-- Stats Overview -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-label">Tasks Today</div>
+                                <div class="stat-value">12</div>
+                                <div class="stat-change positive">
+                                    <span>↑</span>
+                                    <span>85% on track</span>
+                                </div>
+                            </div>
+                            <div class="stat-icon" style="background-color: rgba(0, 113, 227, 0.1); color: var(--accent-primary);">📋</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-label">Active Cases</div>
+                                <div class="stat-value">8</div>
+                                <div class="stat-change">
+                                    <span>→</span>
+                                    <span>2 hearings this week</span>
+                                </div>
+                            </div>
+                            <div class="stat-icon" style="background-color: rgba(191, 90, 242, 0.1); color: var(--accent-purple);">⚖️</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-label">Net Worth</div>
+                                <div class="stat-value">$125.4k</div>
+                                <div class="stat-change positive">
+                                    <span>↑</span>
+                                    <span>+3.2%</span>
+                                </div>
+                            </div>
+                            <div class="stat-icon" style="background-color: rgba(255, 214, 10, 0.1); color: var(--accent-warning);">💰</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-label">Health Score</div>
+                                <div class="stat-value">87%</div>
+                                <div class="stat-change positive">
+                                    <span>↑</span>
+                                    <span>+5 pts</span>
+                                </div>
+                            </div>
+                            <div class="stat-icon" style="background-color: rgba(48, 209, 88, 0.1); color: var(--accent-secondary);">❤️</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-label">Knowledge Items</div>
+                                <div class="stat-value">2,341</div>
+                                <div class="stat-change positive">
+                                    <span>↑</span>
+                                    <span>+47 today</span>
+                                </div>
+                            </div>
+                            <div class="stat-icon" style="background-color: rgba(100, 210, 255, 0.1); color: var(--accent-teal);">🧠</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-label">Habit Streak</div>
+                                <div class="stat-value">21d</div>
+                                <div class="stat-change positive">
+                                    <span>🔥</span>
+                                    <span>Keep going!</span>
+                                </div>
+                            </div>
+                            <div class="stat-icon" style="background-color: rgba(255, 159, 10, 0.1); color: var(--accent-orange);">🎯</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="quick-actions">
+                    <div class="quick-action-card" onclick="showQuickAdd('task')">
+                        <div class="quick-action-icon">➕</div>
+                        <div class="quick-action-label">New Task</div>
+                    </div>
+                    <div class="quick-action-card" onclick="showQuickAdd('note')">
+                        <div class="quick-action-icon">📝</div>
+                        <div class="quick-action-label">Quick Note</div>
+                    </div>
+                    <div class="quick-action-card" onclick="showQuickAdd('expense')">
+                        <div class="quick-action-icon">💸</div>
+                        <div class="quick-action-label">Log Expense</div>
+                    </div>
+                    <div class="quick-action-card" onclick="showQuickAdd('workout')">
+                        <div class="quick-action-icon">🏃</div>
+                        <div class="quick-action-label">Log Workout</div>
+                    </div>
+                    <div class="quick-action-card" onclick="showQuickAdd('case')">
+                        <div class="quick-action-icon">📄</div>
+                        <div class="quick-action-label">New Case</div>
+                    </div>
+                    <div class="quick-action-card" onclick="navigateTo('reviews')">
+                        <div class="quick-action-icon">📊</div>
+                        <div class="quick-action-label">Daily Review</div>
+                    </div>
+                    <div class="quick-action-card" onclick="showQuickAdd('meal')">
+                        <div class="quick-action-icon">🍽️</div>
+                        <div class="quick-action-label">Log Meal</div>
+                    </div>
+                    <div class="quick-action-card" onclick="showQuickAdd('habit')">
+                        <div class="quick-action-icon">✅</div>
+                        <div class="quick-action-label">Check Habit</div>
+                    </div>
+                </div>
+
+                <!-- Today's Focus -->
+                <div class="content-grid">
+                    <div>
+                        <!-- Priority Tasks -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Today's Priorities</h3>
+                                <button class="btn btn-sm btn-ghost" onclick="navigateTo('tasks')">View All</button>
+                            </div>
+                            <div class="task-list">
+                                <div class="list-item">
+                                    <div class="task-checkbox" style="width: 20px; height: 20px; border: 2px solid var(--accent-danger); border-radius: 4px;"></div>
+                                    <div style="flex: 1;">
+                                        <div class="font-semibold">File motion - Anderson v. Blake</div>
+                                        <div class="text-small text-muted">Due by 5:00 PM • Legal</div>
+                                    </div>
+                                    <span class="tag danger">P1</span>
+                                </div>
+                                <div class="list-item">
+                                    <div class="task-checkbox" style="width: 20px; height: 20px; border: 2px solid var(--accent-warning); border-radius: 4px;"></div>
+                                    <div style="flex: 1;">
+                                        <div class="font-semibold">Client meeting - Estate planning</div>
+                                        <div class="text-small text-muted">3:00 PM • 1 hour</div>
+                                    </div>
+                                    <span class="tag warning">P2</span>
+                                </div>
+                                <div class="list-item">
+                                    <div class="task-checkbox" style="width: 20px; height: 20px; border: 2px solid var(--border-color); border-radius: 4px;"></div>
+                                    <div style="flex: 1;">
+                                        <div class="font-semibold">Review Q3 financial statements</div>
+                                        <div class="text-small text-muted">EOD • Finance</div>
+                                    </div>
+                                    <span class="tag">P3</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- AI Insights -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">AI Insights</h3>
+                                <span class="tag primary">🤖 AI</span>
+                            </div>
+                            <div class="insights-list">
+                                <div class="list-item">
+                                    <div class="stat-icon" style="background-color: rgba(255, 69, 58, 0.1); color: var(--accent-danger); width: 40px; height: 40px; font-size: 20px;">⚠️</div>
+                                    <div style="flex: 1;">
+                                        <div class="font-semibold">Upcoming deadline cluster</div>
+                                        <div class="text-small text-muted">You have 5 deadlines in the next 48 hours. Consider delegating or rescheduling lower priority items.</div>
+                                    </div>
+                                </div>
+                                <div class="list-item">
+                                    <div class="stat-icon" style="background-color: rgba(48, 209, 88, 0.1); color: var(--accent-secondary); width: 40px; height: 40px; font-size: 20px;">💡</div>
+                                    <div style="flex: 1;">
+                                        <div class="font-semibold">Productivity pattern detected</div>
+                                        <div class="text-small text-muted">Your focus peaks between 9-11 AM. Schedule complex legal work during this window.</div>
+                                    </div>
+                                </div>
+                                <div class="list-item">
+                                    <div class="stat-icon" style="background-color: rgba(0, 113, 227, 0.1); color: var(--accent-primary); width: 40px; height: 40px; font-size: 20px;">📊</div>
+                                    <div style="flex: 1;">
+                                        <div class="font-semibold">Financial optimization opportunity</div>
+                                        <div class="text-small text-muted">Consider rebalancing portfolio - tech allocation at 42% vs 30% target.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Sidebar -->
+                    <div>
+                        <!-- Activity Feed -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Recent Activity</h3>
+                            </div>
+                            <div class="activity-list">
+                                <div class="list-item">
+                                    <div class="stat-icon" style="background-color: rgba(0, 113, 227, 0.1); color: var(--accent-primary); width: 32px; height: 32px; font-size: 16px;">✓</div>
+                                    <div style="flex: 1;">
+                                        <div class="text-small font-semibold">Completed: Morning workout</div>
+                                        <div class="text-small text-muted">45 min • Upper body</div>
+                                    </div>
+                                    <span class="text-small text-muted">7:30 AM</span>
+                                </div>
+                                <div class="list-item">
+                                    <div class="stat-icon" style="background-color: rgba(191, 90, 242, 0.1); color: var(--accent-purple); width: 32px; height: 32px; font-size: 16px;">📄</div>
+                                    <div style="flex: 1;">
+                                        <div class="text-small font-semibold">Filed: Motion to dismiss</div>
+                                        <div class="text-small text-muted">Johnson v. State</div>
+                                    </div>
+                                    <span class="text-small text-muted">9:15 AM</span>
+                                </div>
+                                <div class="list-item">
+                                    <div class="stat-icon" style="background-color: rgba(255, 214, 10, 0.1); color: var(--accent-warning); width: 32px; height: 32px; font-size: 16px;">💰</div>
+                                    <div style="flex: 1;">
+                                        <div class="text-small font-semibold">Expense: Client lunch</div>
+                                        <div class="text-small text-muted">$85.40 • Deductible</div>
+                                    </div>
+                                    <span class="text-small text-muted">12:45 PM</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Upcoming Events -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Today's Schedule</h3>
+                                <button class="btn btn-sm btn-ghost" onclick="navigateTo('calendar')">📅</button>
+                            </div>
+                            <div class="schedule-list">
+                                <div class="list-item">
+                                    <div class="text-small text-muted" style="width: 50px;">2:00 PM</div>
+                                    <div style="flex: 1;">
+                                        <div class="text-small font-semibold">Team meeting</div>
+                                        <div class="text-small text-muted">Weekly case review</div>
+                                    </div>
+                                </div>
+                                <div class="list-item">
+                                    <div class="text-small text-muted" style="width: 50px;">3:00 PM</div>
+                                    <div style="flex: 1;">
+                                        <div class="text-small font-semibold">Client consultation</div>
+                                        <div class="text-small text-muted">Estate planning - Mr. Thompson</div>
+                                    </div>
+                                </div>
+                                <div class="list-item">
+                                    <div class="text-small text-muted" style="width: 50px;">4:30 PM</div>
+                                    <div style="flex: 1;">
+                                        <div class="text-small font-semibold">Court deadline</div>
+                                        <div class="text-small text-muted">File response - Anderson case</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tasks & Projects Section -->
+        <div class="page-section" id="tasksSection">
+            <div class="page-container">
+                <!-- Task Filters -->
+                <div class="card">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex gap-1">
+                            <button class="btn btn-sm btn-secondary">All Tasks</button>
+                            <button class="btn btn-sm btn-ghost">Today</button>
+                            <button class="btn btn-sm btn-ghost">This Week</button>
+                            <button class="btn btn-sm btn-ghost">Projects</button>
+                        </div>
+                        <div class="flex gap-1">
+                            <button class="btn btn-sm btn-ghost">🔍 Search</button>
+                            <button class="btn btn-sm btn-primary" onclick="showQuickAdd('task')">+ New Task</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kanban Board -->
+                <div class="kanban-board">
+                    <div class="kanban-column">
+                        <div class="kanban-header">
+                            <h3 class="kanban-title">📌 Priority 1</h3>
+                            <span class="kanban-count">5 tasks</span>
+                        </div>
+                        <div class="task-card">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="tag danger">Urgent</span>
+                                <span class="text-small text-muted">Due today</span>
+                            </div>
+                            <h4 class="font-semibold mb-1">File motion for summary judgment</h4>
+                            <p class="text-small text-muted mb-2">Anderson v. Blake - Complete draft and file with court</p>
+                            <div class="flex gap-1">
+                                <span class="tag">⚖️ Legal</span>
+                                <span class="tag">⏱️ 2h est</span>
+                            </div>
+                        </div>
+                        <div class="task-card">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="tag danger">Critical</span>
+                                <span class="text-small text-muted">3:00 PM</span>
+                            </div>
+                            <h4 class="font-semibold mb-1">Client meeting preparation</h4>
+                            <p class="text-small text-muted mb-2">Review estate documents for Thompson consultation</p>
+                            <div class="flex gap-1">
+                                <span class="tag">👥 Meeting</span>
+                                <span class="tag">⏱️ 30m</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="kanban-column">
+                        <div class="kanban-header">
+                            <h3 class="kanban-title">📋 Priority 2</h3>
+                            <span class="kanban-count">8 tasks</span>
+                        </div>
+                        <div class="task-card">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="tag warning">Important</span>
+                                <span class="text-small text-muted">Tomorrow</span>
+                            </div>
+                            <h4 class="font-semibold mb-1">Review contract amendments</h4>
+                            <p class="text-small text-muted mb-2">Tech startup acquisition - 3 contracts to review</p>
+                            <div class="flex gap-1">
+                                <span class="tag">📄 Contract</span>
+                                <span class="tag">⏱️ 3h</span>
+                            </div>
+                        </div>
+                        <div class="task-card">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="tag warning">This week</span>
+                                <span class="text-small text-muted">Friday</span>
+                            </div>
+                            <h4 class="font-semibold mb-1">Monthly financial review</h4>
+                            <p class="text-small text-muted mb-2">Analyze expenses and update budget projections</p>
+                            <div class="flex gap-1">
+                                <span class="tag">💰 Finance</span>
+                                <span class="tag">⏱️ 1h</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="kanban-column">
+                        <div class="kanban-header">
+                            <h3 class="kanban-title">📝 Priority 3</h3>
+                            <span class="kanban-count">12 tasks</span>
+                        </div>
+                        <div class="task-card">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="tag">Normal</span>
+                                <span class="text-small text-muted">Next week</span>
+                            </div>
+                            <h4 class="font-semibold mb-1">Update case management system</h4>
+                            <p class="text-small text-muted mb-2">Input new client data and case notes</p>
+                            <div class="flex gap-1">
+                                <span class="tag">💻 Admin</span>
+                                <span class="tag">⏱️ 45m</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="kanban-column">
+                        <div class="kanban-header">
+                            <h3 class="kanban-title">✅ Completed Today</h3>
+                            <span class="kanban-count">7 tasks</span>
+                        </div>
+                        <div class="task-card" style="opacity: 0.7;">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="tag success">Done</span>
+                                <span class="text-small text-muted">9:30 AM</span>
+                            </div>
+                            <h4 class="font-semibold mb-1" style="text-decoration: line-through;">Morning workout</h4>
+                            <p class="text-small text-muted mb-2">Upper body strength training</p>
+                            <div class="flex gap-1">
+                                <span class="tag">💪 Health</span>
+                                <span class="tag">⏱️ 45m</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Knowledge Base Section -->
+        <div class="page-section" id="knowledgeSection">
+            <div class="page-container">
+                <div class="content-grid">
+                    <div>
+                        <!-- Search and Filters -->
+                        <div class="card">
+                            <div class="form-group mb-3">
+                                <input type="text" class="form-input" placeholder="Search knowledge base..." onkeyup="searchKnowledge(this.value)">
+                            </div>
+                            <div class="flex gap-1 flex-wrap">
+                                <button class="btn btn-sm btn-secondary">All Notes</button>
+                                <button class="btn btn-sm btn-ghost">Legal</button>
+                                <button class="btn btn-sm btn-ghost">Personal</button>
+                                <button class="btn btn-sm btn-ghost">Ideas</button>
+                                <button class="btn btn-sm btn-ghost">Research</button>
+                            </div>
+                        </div>
+
+                        <!-- Recent Notes -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Recent Notes</h3>
+                                <button class="btn btn-sm btn-primary" onclick="showQuickAdd('note')">+ New Note</button>
+                            </div>
+                            <div class="notes-list">
+                                <div class="list-item">
+                                    <div style="flex: 1;">
+                                        <h4 class="font-semibold">Estate Planning Checklist</h4>
+                                        <p class="text-small text-muted mb-1">Key documents needed for comprehensive estate planning...</p>
+                                        <div class="flex gap-1">
+                                            <span class="tag">⚖️ Legal</span>
+                                            <span class="tag">📌 Pinned</span>
+                                            <span class="text-small text-muted">Updated 2h ago</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="list-item">
+                                    <div style="flex: 1;">
+                                        <h4 class="font-semibold">Contract Negotiation Strategies</h4>
+                                        <p class="text-small text-muted mb-1">Best practices for tech startup acquisitions...</p>
+                                        <div class="flex gap-1">
+                                            <span class="tag">📚 Research</span>
+                                            <span class="text-small text-muted">Yesterday</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="list-item">
+                                    <div style="flex: 1;">
+                                        <h4 class="font-semibold">Workout Progressive Overload Plan</h4>
+                                        <p class="text-small text-muted mb-1">Weekly progression for main compound lifts...</p>
+                                        <div class="flex gap-1">
+                                            <span class="tag">💪 Fitness</span>
+                                            <span class="text-small text-muted">3 days ago</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Knowledge Stats -->
+                    <div>
+                        <div class="card">
+                            <h3 class="card-title mb-3">Knowledge Stats</h3>
+                            <div class="stat-item mb-3">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-small text-muted">Total Items</span>
+                                    <span class="font-semibold">2,341</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 75%;"></div>
+                                </div>
+                            </div>
+                            <div class="stat-item mb-3">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-small text-muted">This Month</span>
+                                    <span class="font-semibold">147</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 85%; background-color: var(--accent-secondary);"></div>
+                                </div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-small text-muted">Categories</span>
+                                    <span class="font-semibold">24</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <h3 class="card-title mb-3">Top Categories</h3>
+                            <div class="category-list">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-small">⚖️ Legal Research</span>
+                                    <span class="tag">482</span>
+                                </div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-small">💡 Ideas & Projects</span>
+                                    <span class="tag">341</span>
+                                </div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-small">📚 Book Notes</span>
+                                    <span class="tag">298</span>
+                                </div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-small">🧠 Meeting Notes</span>
+                                    <span class="tag">276</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reviews Section -->
+        <div class="page-section" id="reviewsSection">
+            <div class="page-container">
+                <!-- Review Types -->
+                <div class="quick-actions mb-3">
+                    <div class="quick-action-card" onclick="startReview('daily')">
+                        <div class="quick-action-icon">🌅</div>
+                        <div class="quick-action-label">Daily Review</div>
+                    </div>
+                    <div class="quick-action-card" onclick="startReview('weekly')">
+                        <div class="quick-action-icon">📅</div>
+                        <div class="quick-action-label">Weekly Review</div>
+                    </div>
+                    <div class="quick-action-card" onclick="startReview('monthly')">
+                        <div class="quick-action-icon">📊</div>
+                        <div class="quick-action-label">Monthly Review</div>
+                    </div>
+                    <div class="quick-action-card" onclick="startReview('quarterly')">
+                        <div class="quick-action-icon">🎯</div>
+                        <div class="quick-action-label">Quarterly Review</div>
+                    </div>
+                </div>
+
+                <div class="content-grid">
+                    <div>
+                        <!-- Today's Review -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Daily Review - ${new Date().toLocaleDateString()}</h3>
+                                <button class="btn btn-sm btn-primary" onclick="startReview('daily')">Start Review</button>
+                            </div>
+                            <div class="review-checklist">
+                                <div class="list-item">
+                                    <input type="checkbox" style="width: 18px; height: 18px;">
+                                    <div style="flex: 1;">
+                                        <div class="font-semibold">Morning Planning</div>
+                                        <div class="text-small text-muted">Review priorities and schedule for the day</div>
+                                    </div>
+                                </div>
+                                <div class="list-item">
+                                    <input type="checkbox" style="width: 18px; height: 18px;">
+                                    
