@@ -1,9 +1,12 @@
-import { Task, Case, Person, AppData } from './types';
+import { Task, Case, Person, Note, Category, Topic, NoteLink, AppData } from './types';
 
 const STORAGE_KEYS = {
   TASKS: 'lifeos-tasks',
   CASES: 'lifeos-cases',
   PEOPLE: 'lifeos-people',
+  NOTES: 'lifeos-notes',
+  CATEGORIES: 'lifeos-categories',
+  NOTE_LINKS: 'lifeos-note-links',
   VERSION: 'lifeos-version',
   LAST_SYNC: 'lifeos-last-sync'
 } as const;
@@ -20,6 +23,12 @@ export class LocalStorage {
       // First time setup
       this.setSampleData();
       localStorage.setItem(STORAGE_KEYS.VERSION, '1.0.0');
+    }
+    
+    // Initialize categories if they don't exist
+    const categories = this.getCategories();
+    if (categories.length === 0) {
+      this.initializeDefaultCategories();
     }
   }
 
@@ -209,6 +218,218 @@ export class LocalStorage {
     );
   }
 
+  // Notes
+  static getNotes(): Note[] {
+    if (!this.isClient) return [];
+    const data = localStorage.getItem(STORAGE_KEYS.NOTES);
+    return data ? JSON.parse(data) : [];
+  }
+
+  static saveNotes(notes: Note[]) {
+    if (!this.isClient) return;
+    localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
+    this.updateLastSync();
+    this.updateCategoryCounts();
+  }
+
+  static createNote(noteData: Partial<Note>): Note {
+    const notes = this.getNotes();
+    const newNote: Note = {
+      id: crypto.randomUUID(),
+      title: noteData.title || '',
+      content: noteData.content || '',
+      categoryId: noteData.categoryId || '',
+      linkedTopicIds: noteData.linkedTopicIds || [],
+      linkedCaseIds: noteData.linkedCaseIds || [],
+      linkedTaskIds: noteData.linkedTaskIds || [],
+      linkedPersonIds: noteData.linkedPersonIds || [],
+      linkedNoteIds: noteData.linkedNoteIds || [],
+      tags: noteData.tags || [],
+      status: noteData.status || 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...noteData
+    };
+
+    const updatedNotes = [newNote, ...notes];
+    this.saveNotes(updatedNotes);
+    return newNote;
+  }
+
+  static updateNote(id: string, updates: Partial<Note>): Note | null {
+    const notes = this.getNotes();
+    const noteIndex = notes.findIndex(note => note.id === id);
+    
+    if (noteIndex === -1) return null;
+
+    const updatedNote = {
+      ...notes[noteIndex],
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+
+    notes[noteIndex] = updatedNote;
+    this.saveNotes(notes);
+    return updatedNote;
+  }
+
+  static deleteNote(id: string): boolean {
+    const notes = this.getNotes();
+    const filteredNotes = notes.filter(note => note.id !== id);
+    
+    if (filteredNotes.length < notes.length) {
+      this.saveNotes(filteredNotes);
+      return true;
+    }
+    return false;
+  }
+
+  // Categories
+  static getCategories(): Category[] {
+    if (!this.isClient) return [];
+    const data = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
+    return data ? JSON.parse(data) : [];
+  }
+
+  static saveCategories(categories: Category[]) {
+    if (!this.isClient) return;
+    localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories));
+    this.updateLastSync();
+  }
+
+  static createCategory(categoryData: Partial<Category>): Category {
+    const categories = this.getCategories();
+    const newCategory: Category = {
+      id: crypto.randomUUID(),
+      name: categoryData.name || '',
+      color: categoryData.color || '#6B7280',
+      icon: categoryData.icon || '📝',
+      noteCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...categoryData
+    };
+
+    const updatedCategories = [...categories, newCategory];
+    this.saveCategories(updatedCategories);
+    return newCategory;
+  }
+
+  static updateCategoryCounts() {
+    const categories = this.getCategories();
+    const notes = this.getNotes();
+    
+    const updatedCategories = categories.map(category => ({
+      ...category,
+      noteCount: notes.filter(note => note.categoryId === category.id).length
+    }));
+    
+    this.saveCategories(updatedCategories);
+  }
+
+  static initializeDefaultCategories() {
+    const defaultCategories: Partial<Category>[] = [
+      {
+        name: 'Meeting Notes',
+        color: '#3B82F6',
+        icon: '📋',
+        description: 'Notes from meetings and calls'
+      },
+      {
+        name: 'Case Notes',
+        color: '#8B5CF6',
+        icon: '⚖️',
+        description: 'Research and notes related to specific cases'
+      },
+      {
+        name: 'Articles',
+        color: '#10B981',
+        icon: '📰',
+        description: 'Saved articles and external content'
+      },
+      {
+        name: 'References',
+        color: '#F59E0B',
+        icon: '🔗',
+        description: 'Links and reference materials'
+      },
+      {
+        name: 'Ideas',
+        color: '#EF4444',
+        icon: '💡',
+        description: 'Personal ideas and insights'
+      },
+      {
+        name: 'Documents',
+        color: '#6B7280',
+        icon: '📄',
+        description: 'Important documents and files'
+      }
+    ];
+
+    defaultCategories.forEach(categoryData => {
+      this.createCategory(categoryData);
+    });
+  }
+
+  // Topics CRUD
+  static getTopics(): Topic[] {
+    if (!this.isClient) return [];
+    const data = localStorage.getItem('lifeos-topics');
+    return data ? JSON.parse(data) : [];
+  }
+
+  static saveTopics(topics: Topic[]) {
+    if (!this.isClient) return;
+    localStorage.setItem('lifeos-topics', JSON.stringify(topics));
+    this.updateLastSync();
+  }
+
+  static createTopic(topicData: Partial<Topic>): Topic {
+    const topics = this.getTopics();
+    const newTopic: Topic = {
+      id: crypto.randomUUID(),
+      name: topicData.name || '',
+      color: topicData.color || '#f97316',
+      noteCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...topicData
+    };
+
+    const updatedTopics = [...topics, newTopic];
+    this.saveTopics(updatedTopics);
+    return newTopic;
+  }
+
+  static updateTopic(id: string, updates: Partial<Topic>): Topic | null {
+    const topics = this.getTopics();
+    const topicIndex = topics.findIndex(t => t.id === id);
+    
+    if (topicIndex === -1) return null;
+
+    const updatedTopic = {
+      ...topics[topicIndex],
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+
+    topics[topicIndex] = updatedTopic;
+    this.saveTopics(topics);
+    return updatedTopic;
+  }
+
+  static deleteTopic(id: string): boolean {
+    const topics = this.getTopics();
+    const filteredTopics = topics.filter(t => t.id !== id);
+    
+    if (filteredTopics.length < topics.length) {
+      this.saveTopics(filteredTopics);
+      return true;
+    }
+    return false;
+  }
+
   // Utility functions
   private static updateLastSync() {
     if (!this.isClient) return;
@@ -221,6 +442,10 @@ export class LocalStorage {
       tasks: this.getTasks(),
       cases: this.getCases(),
       people: this.getPeople(),
+      notes: this.getNotes(),
+      categories: this.getCategories(),
+      topics: this.getTopics(),
+      noteLinks: [], // Will implement later
       version: '1.0.0',
       lastSync: new Date().toISOString()
     };
@@ -233,6 +458,8 @@ export class LocalStorage {
     this.saveTasks(data.tasks);
     this.saveCases(data.cases);
     this.savePeople(data.people);
+    if (data.notes) this.saveNotes(data.notes);
+    if (data.categories) this.saveCategories(data.categories);
     localStorage.setItem(STORAGE_KEYS.VERSION, data.version);
   }
 

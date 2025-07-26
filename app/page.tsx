@@ -2,136 +2,192 @@
 
 import React from 'react';
 import Navigation from './components/Navigation';
-import DashboardCard from './components/DashboardCard';
 import { 
   CheckSquare, Brain, Briefcase, DollarSign, Heart, Home,
-  Clock, TrendingUp, Calendar, FileText, Plus, Zap
+  Clock, TrendingUp, Calendar, FileText, Plus, Zap, AlertTriangle,
+  Lightbulb, BarChart3, Target, Activity, BookOpen, Coffee, Dumbbell
 } from 'lucide-react';
 
 export default function Dashboard() {
-  // Mock data - in real implementation, this would come from your data stores
-  const todaysTasks = 5;
-  const totalNotes = 0; // Knowledge system not built yet
-  const activeCases = 0; // Legal system not built yet
-  const netWorth = 0; // Finance system not built yet
+  // Enhanced data - in real implementation, this would come from your data stores
+  const todaysTasks = 12;
+  const activeCases = 8;
+  const netWorth = 125400; // $125.4k
+  const healthScore = 87;
+  const knowledgeItems = 2341;
+  const habitStreak = 21;
 
-  const recentTasks = [
-    "Review contract for Smith case",
-    "Call opposing counsel at 2pm",
-    "Prepare deposition questions"
-  ];
-
-  const recentNotes = [
-    // Will be populated when knowledge system is built
-  ];
-
-  const modules = [
+  // Enhanced stats with better visuals and data
+  const enhancedStats = [
     {
-      title: "Task Management",
-      description: "Organize work and personal tasks with AI-powered insights",
-      icon: CheckSquare,
-      path: "/tasks",
-      color: "from-green-500 to-emerald-600",
-      stats: {
-        primary: `${todaysTasks} due today`,
-        secondary: "12 active"
-      },
-      recentItems: recentTasks
-    },
-    {
-      title: "Knowledge Hub",
-      description: "Capture, organize, and retrieve all your information",
-      icon: Brain,
-      path: "/knowledge",
-      color: "from-purple-500 to-violet-600",
-      stats: {
-        primary: totalNotes > 0 ? `${totalNotes} notes` : "Ready to start",
-        secondary: totalNotes > 0 ? "Searchable" : undefined
-      },
-      recentItems: recentNotes
-    },
-    {
-      title: "Legal Practice",
-      description: "Case management, deadlines, and court integration",
-      icon: Briefcase,
-      path: "/legal",
-      color: "from-yellow-500 to-orange-600",
-      disabled: true,
-      stats: {
-        primary: "Phase 2",
-        secondary: "Q2 2025"
-      }
-    },
-    {
-      title: "Financial Intelligence",
-      description: "Net worth tracking, expenses, and investment analysis",
-      icon: DollarSign,
-      path: "/finance",
-      color: "from-emerald-500 to-teal-600",
-      disabled: true,
-      stats: {
-        primary: "Phase 3",
-        secondary: "Q3 2025"
-      }
-    },
-    {
-      title: "Health & Wellness",
-      description: "Fitness tracking, nutrition, and health optimization",
-      icon: Heart,
-      path: "/health",
-      color: "from-red-500 to-pink-600",
-      disabled: true,
-      stats: {
-        primary: "Phase 4",
-        secondary: "Q4 2025"
-      }
-    },
-    {
-      title: "Life Management",
-      description: "Household, travel, entertainment, and learning",
-      icon: Home,
-      path: "/life",
-      color: "from-orange-500 to-red-600",
-      disabled: true,
-      stats: {
-        primary: "Phase 5",
-        secondary: "2026"
-      }
-    }
-  ];
-
-  const quickStats = [
-    {
-      label: "Today's Tasks",
+      label: "Tasks Today",
       value: todaysTasks.toString(),
+      change: "85% on track",
+      changeType: "positive",
       icon: CheckSquare,
-      color: "text-green-400"
+      iconBg: "bg-blue-500/10",
+      iconColor: "text-blue-400",
+      emoji: "📋"
     },
     {
-      label: "This Week",
-      value: "23 tasks",
-      icon: Calendar,
-      color: "text-blue-400"
+      label: "Active Cases",
+      value: activeCases.toString(),
+      change: "2 hearings this week",
+      changeType: "neutral",
+      icon: Briefcase,
+      iconBg: "bg-purple-500/10",
+      iconColor: "text-purple-400",
+      emoji: "⚖️"
     },
     {
-      label: "Knowledge Base",
-      value: totalNotes > 0 ? `${totalNotes} notes` : "Ready",
+      label: "Net Worth",
+      value: `$${(netWorth / 1000).toFixed(1)}k`,
+      change: "+3.2%",
+      changeType: "positive",
+      icon: DollarSign,
+      iconBg: "bg-yellow-500/10",
+      iconColor: "text-yellow-400",
+      emoji: "💰"
+    },
+    {
+      label: "Health Score",
+      value: `${healthScore}%`,
+      change: "+5 pts",
+      changeType: "positive",
+      icon: Heart,
+      iconBg: "bg-green-500/10",
+      iconColor: "text-green-400",
+      emoji: "❤️"
+    },
+    {
+      label: "Knowledge Items",
+      value: knowledgeItems.toLocaleString(),
+      change: "+47 today",
+      changeType: "positive",
       icon: Brain,
-      color: "text-purple-400"
+      iconBg: "bg-cyan-500/10",
+      iconColor: "text-cyan-400",
+      emoji: "🧠"
     },
     {
-      label: "Productivity",
-      value: "↗ 15%",
-      icon: TrendingUp,
-      color: "text-emerald-400"
+      label: "Habit Streak",
+      value: `${habitStreak}d`,
+      change: "Keep going!",
+      changeType: "positive",
+      icon: Target,
+      iconBg: "bg-orange-500/10",
+      iconColor: "text-orange-400",
+      emoji: "🎯"
     }
   ];
 
+  // Quick actions for common tasks
+  const quickActions = [
+    { label: "New Task", icon: "➕", action: "task" },
+    { label: "Quick Note", icon: "📝", action: "note" },
+    { label: "Log Expense", icon: "💸", action: "expense" },
+    { label: "Log Workout", icon: "🏃", action: "workout" },
+    { label: "New Case", icon: "📄", action: "case" },
+    { label: "Daily Review", icon: "📊", action: "review" },
+    { label: "Log Meal", icon: "🍽️", action: "meal" },
+    { label: "Check Habit", icon: "✅", action: "habit" }
+  ];
+
+  // Priority tasks with enhanced display
+  const priorityTasks = [
+    {
+      title: "File motion - Anderson v. Blake",
+      description: "Complete draft and file with court",
+      dueTime: "Due by 5:00 PM",
+      category: "Legal",
+      priority: "P1",
+      priorityColor: "bg-red-500/10 text-red-400 border-red-500/20",
+      urgency: "danger"
+    },
+    {
+      title: "Client meeting - Estate planning", 
+      description: "Review documents for Thompson consultation",
+      dueTime: "3:00 PM • 1 hour",
+      category: "Meeting",
+      priority: "P2",
+      priorityColor: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+      urgency: "warning"
+    },
+    {
+      title: "Review Q3 financial statements",
+      description: "Analyze expenses and update budget projections", 
+      dueTime: "EOD • Finance",
+      category: "Finance",
+      priority: "P3",
+      priorityColor: "bg-gray-500/10 text-gray-400 border-gray-500/20",
+      urgency: "normal"
+    }
+  ];
+
+  // AI insights
+  const aiInsights = [
+    {
+      type: "warning",
+      icon: "⚠️",
+      iconColor: "text-red-400",
+      iconBg: "bg-red-500/10",
+      title: "Upcoming deadline cluster",
+      description: "You have 5 deadlines in the next 48 hours. Consider delegating or rescheduling lower priority items."
+    },
+    {
+      type: "tip",
+      icon: "💡", 
+      iconColor: "text-green-400",
+      iconBg: "bg-green-500/10",
+      title: "Productivity pattern detected",
+      description: "Your focus peaks between 9-11 AM. Schedule complex legal work during this window."
+    },
+    {
+      type: "insight",
+      icon: "📊",
+      iconColor: "text-blue-400", 
+      iconBg: "bg-blue-500/10",
+      title: "Financial optimization opportunity",
+      description: "Consider rebalancing portfolio - tech allocation at 42% vs 30% target."
+    }
+  ];
+
+  // Enhanced recent activity
   const recentActivity = [
-    { type: "task", text: "Completed: Call client about settlement", time: "2 hours ago" },
-    { type: "task", text: "Created: Prepare for deposition", time: "4 hours ago" },
-    { type: "system", text: "AI estimated task times for today", time: "This morning" },
-    { type: "task", text: "Completed: Review discovery documents", time: "Yesterday" }
+    {
+      type: "task",
+      icon: "✓",
+      iconColor: "text-blue-400",
+      iconBg: "bg-blue-500/10",
+      title: "Completed: Morning workout",
+      description: "45 min • Upper body",
+      time: "7:30 AM"
+    },
+    {
+      type: "legal",
+      icon: "📄",
+      iconColor: "text-purple-400", 
+      iconBg: "bg-purple-500/10",
+      title: "Filed: Motion to dismiss",
+      description: "Johnson v. State",
+      time: "9:15 AM"
+    },
+    {
+      type: "finance",
+      icon: "💰",
+      iconColor: "text-yellow-400",
+      iconBg: "bg-yellow-500/10", 
+      title: "Expense: Client lunch",
+      description: "$85.40 • Deductible",
+      time: "12:45 PM"
+    }
+  ];
+
+  // Today's schedule
+  const todaysSchedule = [
+    { time: "2:00 PM", title: "Team meeting", description: "Weekly case review" },
+    { time: "3:00 PM", title: "Client consultation", description: "Estate planning - Mr. Thompson" },
+    { time: "4:30 PM", title: "Court deadline", description: "File response - Anderson case" }
   ];
 
   return (
@@ -154,70 +210,163 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {quickStats.map((stat, index) => {
-            const Icon = stat.icon;
-            return (
-              <div key={index} className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-400">{stat.label}</p>
-                    <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+        {/* Enhanced Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+          {enhancedStats.map((stat, index) => (
+            <div 
+              key={index} 
+              className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 transition-all hover:transform hover:-translate-y-1"
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1">
+                  <p className="text-xs text-gray-500 mb-1">{stat.label}</p>
+                  <p className="text-2xl font-bold text-white">{stat.value}</p>
+                  <div className={`text-xs flex items-center gap-1 ${
+                    stat.changeType === 'positive' ? 'text-green-400' : 
+                    stat.changeType === 'negative' ? 'text-red-400' : 'text-gray-400'
+                  }`}>
+                    {stat.changeType === 'positive' && <span>↑</span>}
+                    {stat.changeType === 'negative' && <span>↓</span>}
+                    {stat.changeType === 'neutral' && <span>→</span>}
+                    <span>{stat.change}</span>
                   </div>
-                  <Icon className={`h-8 w-8 ${stat.color}`} />
+                </div>
+                <div className={`w-10 h-10 rounded-lg ${stat.iconBg} flex items-center justify-center text-lg`}>
+                  {stat.emoji}
                 </div>
               </div>
-            );
-          })}
-        </div>
-
-        {/* Main Module Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {modules.map((module, index) => (
-            <DashboardCard
-              key={index}
-              title={module.title}
-              description={module.description}
-              icon={module.icon}
-              path={module.path}
-              color={module.color}
-              stats={module.stats}
-              disabled={module.disabled}
-              recentItems={module.recentItems}
-            />
+            </div>
           ))}
         </div>
 
-        {/* Recent Activity */}
-        <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">Recent Activity</h2>
-            <button className="text-sm text-gray-400 hover:text-white transition-colors">
-              View All
-            </button>
-          </div>
-          
-          <div className="space-y-3">
-            {recentActivity.map((activity, index) => (
-              <div key={index} className="flex items-start space-x-3">
-                <div className={`w-2 h-2 rounded-full mt-2 ${
-                  activity.type === 'task' ? 'bg-green-400' : 'bg-blue-400'
-                }`} />
-                <div className="flex-1">
-                  <p className="text-sm text-gray-300">{activity.text}</p>
-                  <p className="text-xs text-gray-500">{activity.time}</p>
-                </div>
+        {/* Quick Actions */}
+        <div className="grid grid-cols-4 md:grid-cols-8 gap-3 mb-8">
+          {quickActions.map((action, index) => (
+            <div
+              key={index}
+              className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 hover:bg-gray-800/50 transition-all cursor-pointer text-center group"
+            >
+              <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">
+                {action.icon}
               </div>
-            ))}
+              <div className="text-xs text-gray-400 group-hover:text-gray-300">
+                {action.label}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Priority Tasks */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Priority Tasks */}
+            <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-white">Today's Priorities</h3>
+                <button className="text-sm text-gray-400 hover:text-white transition-colors">
+                  View All →
+                </button>
+              </div>
+              <div className="space-y-4">
+                {priorityTasks.map((task, index) => (
+                  <div
+                    key={index}
+                    className="flex items-start gap-4 p-4 bg-gray-800/30 rounded-lg hover:bg-gray-800/50 transition-all cursor-pointer"
+                  >
+                    <div className="w-5 h-5 border-2 border-gray-600 rounded mt-1"></div>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-white mb-1">{task.title}</h4>
+                      <p className="text-sm text-gray-400 mb-2">{task.description}</p>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-gray-500">{task.dueTime}</span>
+                        <span className="text-xs text-gray-500">•</span>
+                        <span className="text-xs text-gray-500">{task.category}</span>
+                      </div>
+                    </div>
+                    <span className={`px-2 py-1 rounded text-xs font-medium border ${task.priorityColor}`}>
+                      {task.priority}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* AI Insights */}
+            <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-white">AI Insights</h3>
+                <span className="px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded text-xs font-medium">
+                  🤖 AI
+                </span>
+              </div>
+              <div className="space-y-4">
+                {aiInsights.map((insight, index) => (
+                  <div key={index} className="flex items-start gap-4">
+                    <div className={`w-10 h-10 rounded-lg ${insight.iconBg} flex items-center justify-center text-lg flex-shrink-0`}>
+                      {insight.icon}
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-white mb-1">{insight.title}</h4>
+                      <p className="text-sm text-gray-400">{insight.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column - Activity & Schedule */}
+          <div className="space-y-6">
+            {/* Recent Activity */}
+            <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-6">Recent Activity</h3>
+              <div className="space-y-4">
+                {recentActivity.map((activity, index) => (
+                  <div key={index} className="flex items-start gap-3">
+                    <div className={`w-8 h-8 rounded-lg ${activity.iconBg} flex items-center justify-center text-sm flex-shrink-0`}>
+                      {activity.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-medium text-white">{activity.title}</h4>
+                      <p className="text-xs text-gray-400">{activity.description}</p>
+                    </div>
+                    <span className="text-xs text-gray-500 flex-shrink-0">{activity.time}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Today's Schedule */}
+            <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-white">Today's Schedule</h3>
+                <button className="text-gray-400 hover:text-white transition-colors">
+                  📅
+                </button>
+              </div>
+              <div className="space-y-4">
+                {todaysSchedule.map((item, index) => (
+                  <div key={index} className="flex items-start gap-3">
+                    <div className="text-xs text-gray-500 w-14 flex-shrink-0 pt-1">
+                      {item.time}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-white">{item.title}</h4>
+                      <p className="text-xs text-gray-400">{item.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Quick Actions */}
+        {/* Enhanced Quick Actions FAB */}
         <div className="fixed bottom-6 right-6">
           <div className="flex flex-col space-y-3">
-            <button className="w-12 h-12 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center shadow-lg transition-all">
-              <Plus className="h-6 w-6 text-white" />
+            <button className="w-14 h-14 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-full flex items-center justify-center shadow-2xl transition-all hover:scale-110">
+              <Plus className="h-7 w-7 text-white" />
             </button>
           </div>
         </div>
