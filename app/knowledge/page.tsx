@@ -42,6 +42,14 @@ export default function KnowledgePage() {
   const [editingTagValue, setEditingTagValue] = useState('');
   const [addingTagToNote, setAddingTagToNote] = useState<string | null>(null);
   const [newTagValue, setNewTagValue] = useState('');
+  
+  // Inline editing for other badges
+  const [editingPerson, setEditingPerson] = useState<{ noteId: string; personId: string } | null>(null);
+  const [editingPersonValue, setEditingPersonValue] = useState('');
+  const [editingCase, setEditingCase] = useState<{ noteId: string; caseId: string } | null>(null);
+  const [editingCaseValue, setEditingCaseValue] = useState('');
+  const [editingTopic, setEditingTopic] = useState<{ noteId: string; topicId: string } | null>(null);
+  const [editingTopicValue, setEditingTopicValue] = useState('');
 
   useEffect(() => {
     LocalStorage.initialize();
@@ -364,36 +372,102 @@ export default function KnowledgePage() {
     }
   };
 
-  const editPerson = (noteId: string, personId: string) => {
-    const person = people.find(p => p.id === personId);
-    if (person) {
-      const newName = prompt(`Edit person name:`, person.name);
-      if (newName && newName !== person.name) {
-        LocalStorage.updatePerson(personId, { name: newName });
-        loadData();
-      }
+  // Inline editing functions for Person badges
+  const startEditingPerson = (noteId: string, personId: string, currentValue: string) => {
+    setEditingPerson({ noteId, personId });
+    setEditingPersonValue(currentValue);
+  };
+
+  const saveEditingPerson = () => {
+    if (!editingPerson || !editingPersonValue.trim()) {
+      cancelEditingPerson();
+      return;
+    }
+
+    LocalStorage.updatePerson(editingPerson.personId, { name: editingPersonValue.trim() });
+    loadData();
+    setEditingPerson(null);
+    setEditingPersonValue('');
+  };
+
+  const cancelEditingPerson = () => {
+    setEditingPerson(null);
+    setEditingPersonValue('');
+  };
+
+  const handlePersonKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveEditingPerson();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelEditingPerson();
     }
   };
 
-  const editCase = (noteId: string, caseId: string) => {
-    const caseItem = cases.find(c => c.id === caseId);
-    if (caseItem) {
-      const newName = prompt(`Edit case name:`, caseItem.name);
-      if (newName && newName !== caseItem.name) {
-        LocalStorage.updateCase(caseId, { name: newName });
-        loadData();
-      }
+  // Inline editing functions for Case badges
+  const startEditingCase = (noteId: string, caseId: string, currentValue: string) => {
+    setEditingCase({ noteId, caseId });
+    setEditingCaseValue(currentValue);
+  };
+
+  const saveEditingCase = () => {
+    if (!editingCase || !editingCaseValue.trim()) {
+      cancelEditingCase();
+      return;
+    }
+
+    LocalStorage.updateCase(editingCase.caseId, { name: editingCaseValue.trim() });
+    loadData();
+    setEditingCase(null);
+    setEditingCaseValue('');
+  };
+
+  const cancelEditingCase = () => {
+    setEditingCase(null);
+    setEditingCaseValue('');
+  };
+
+  const handleCaseKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveEditingCase();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelEditingCase();
     }
   };
 
-  const editTopic = (noteId: string, topicId: string) => {
-    const topic = topics.find(t => t.id === topicId);
-    if (topic) {
-      const newName = prompt(`Edit topic name:`, topic.name);
-      if (newName && newName !== topic.name) {
-        LocalStorage.updateTopic(topicId, { name: newName });
-        loadData();
-      }
+  // Inline editing functions for Topic badges
+  const startEditingTopic = (noteId: string, topicId: string, currentValue: string) => {
+    setEditingTopic({ noteId, topicId });
+    setEditingTopicValue(currentValue);
+  };
+
+  const saveEditingTopic = () => {
+    if (!editingTopic || !editingTopicValue.trim()) {
+      cancelEditingTopic();
+      return;
+    }
+
+    LocalStorage.updateTopic(editingTopic.topicId, { name: editingTopicValue.trim() });
+    loadData();
+    setEditingTopic(null);
+    setEditingTopicValue('');
+  };
+
+  const cancelEditingTopic = () => {
+    setEditingTopic(null);
+    setEditingTopicValue('');
+  };
+
+  const handleTopicKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveEditingTopic();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelEditingTopic();
     }
   };
 
@@ -895,37 +969,106 @@ export default function KnowledgePage() {
 
                         {/* Topic Badges */}
                         {linkedTopics.map(topic => (
-                          <span 
-                            key={topic.id}
-                            onClick={() => editTopic(note.id, topic.id)}
-                            className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30 cursor-pointer hover:bg-orange-500/30 transition-all"
-                            title="Click to edit topic"
-                          >
-                            ~ {topic.name}
+                          <span key={topic.id}>
+                            {editingTopic?.topicId === topic.id ? (
+                              /* Inline editing mode */
+                              <input
+                                type="text"
+                                value={editingTopicValue}
+                                onChange={(e) => setEditingTopicValue(e.target.value)}
+                                onKeyDown={handleTopicKeyDown}
+                                onBlur={(e) => {
+                                  setTimeout(() => saveEditingTopic(), 100);
+                                }}
+                                autoFocus
+                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/40 text-orange-100 border border-orange-400 focus:ring-2 focus:ring-orange-500/50 focus:border-orange-400 outline-none min-w-[60px] max-w-[120px]"
+                                style={{ width: `${Math.max(60, editingTopicValue.length * 8 + 20)}px` }}
+                              />
+                            ) : (
+                              /* Display mode */
+                              <span 
+                                onClick={(e) => {
+                                  console.log('Topic clicked:', topic.name, 'topicId:', topic.id);
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  startEditingTopic(note.id, topic.id, topic.name);
+                                }}
+                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30 cursor-pointer hover:bg-orange-500/30 transition-all"
+                                title="Click to edit topic"
+                              >
+                                ~ {topic.name}
+                              </span>
+                            )}
                           </span>
                         ))}
 
                         {/* People Badges */}
                         {linkedPeople.map(person => (
-                          <span 
-                            key={person.id}
-                            onClick={() => editPerson(note.id, person.id)}
-                            className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 cursor-pointer hover:bg-blue-500/30 transition-all"
-                            title="Click to edit person"
-                          >
-                            @ {person.name}
+                          <span key={person.id}>
+                            {editingPerson?.personId === person.id ? (
+                              /* Inline editing mode */
+                              <input
+                                type="text"
+                                value={editingPersonValue}
+                                onChange={(e) => setEditingPersonValue(e.target.value)}
+                                onKeyDown={handlePersonKeyDown}
+                                onBlur={(e) => {
+                                  setTimeout(() => saveEditingPerson(), 100);
+                                }}
+                                autoFocus
+                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-500/40 text-blue-100 border border-blue-400 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 outline-none min-w-[60px] max-w-[120px]"
+                                style={{ width: `${Math.max(60, editingPersonValue.length * 8 + 20)}px` }}
+                              />
+                            ) : (
+                              /* Display mode */
+                              <span 
+                                onClick={(e) => {
+                                  console.log('Person clicked:', person.name, 'personId:', person.id);
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  startEditingPerson(note.id, person.id, person.name);
+                                }}
+                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 cursor-pointer hover:bg-blue-500/30 transition-all"
+                                title="Click to edit person"
+                              >
+                                @ {person.name}
+                              </span>
+                            )}
                           </span>
                         ))}
 
                         {/* Case Badges */}
                         {linkedCases.map(caseItem => (
-                          <span 
-                            key={caseItem.id}
-                            onClick={() => editCase(note.id, caseItem.id)}
-                            className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-500/20 text-green-400 border border-green-500/30 cursor-pointer hover:bg-green-500/30 transition-all"
-                            title="Click to edit case"
-                          >
-                            # {caseItem.name}
+                          <span key={caseItem.id}>
+                            {editingCase?.caseId === caseItem.id ? (
+                              /* Inline editing mode */
+                              <input
+                                type="text"
+                                value={editingCaseValue}
+                                onChange={(e) => setEditingCaseValue(e.target.value)}
+                                onKeyDown={handleCaseKeyDown}
+                                onBlur={(e) => {
+                                  setTimeout(() => saveEditingCase(), 100);
+                                }}
+                                autoFocus
+                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-500/40 text-green-100 border border-green-400 focus:ring-2 focus:ring-green-500/50 focus:border-green-400 outline-none min-w-[60px] max-w-[120px]"
+                                style={{ width: `${Math.max(60, editingCaseValue.length * 8 + 20)}px` }}
+                              />
+                            ) : (
+                              /* Display mode */
+                              <span 
+                                onClick={(e) => {
+                                  console.log('Case clicked:', caseItem.name, 'caseId:', caseItem.id);
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  startEditingCase(note.id, caseItem.id, caseItem.name);
+                                }}
+                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-500/20 text-green-400 border border-green-500/30 cursor-pointer hover:bg-green-500/30 transition-all"
+                                title="Click to edit case"
+                              >
+                                # {caseItem.name}
+                              </span>
+                            )}
                           </span>
                         ))}
 
