@@ -376,26 +376,16 @@ export default function KnowledgePage() {
         tags: parsed.tags
       });
 
-      // Analyze the note with AI if it has meaningful content
-      if (cleanTitle.trim().length > 10) {
-        try {
-          setIsAnalyzingNote(createdNote.id);
-          const analysis = await analyzeNote(cleanTitle);
-          setNoteAnalysis(prev => ({
-            ...prev,
-            [createdNote.id]: analysis
-          }));
-        } catch (error) {
-          console.error('Failed to analyze note:', error);
-        } finally {
-          setIsAnalyzingNote(null);
-        }
-      }
-      
       setNewNote('');
+      
+      // Update UI immediately (optimistic update)
+      loadData();
+
+      // Analyze the note with AI in the background (non-blocking)
+      if (cleanTitle.trim().length > 10) {
+        analyzeNoteAsync(createdNote.id, cleanTitle);
+      }
     }
-    
-    loadData();
   };
 
   const addTag = () => {
@@ -713,6 +703,34 @@ export default function KnowledgePage() {
     } finally {
       setIsGeneratingInsights(false);
     }
+  };
+
+  const analyzeNoteAsync = (noteId: string, content: string) => {
+    // Clean content and ensure minimum length
+    const cleanContent = content.trim();
+    if (!cleanContent || cleanContent.length < 5) {
+      console.log('Content too short for analysis:', cleanContent);
+      return;
+    }
+    
+    console.log('Starting background AI analysis for note:', noteId, 'Content:', cleanContent);
+    setIsAnalyzingNote(noteId);
+    
+    // Fire-and-forget AI analysis (non-blocking)
+    analyzeNote(cleanContent)
+      .then(analysis => {
+        console.log('Background AI analysis completed:', analysis);
+        setNoteAnalysis(prev => ({
+          ...prev,
+          [noteId]: analysis
+        }));
+      })
+      .catch(error => {
+        console.error('Failed to analyze note in background:', error);
+      })
+      .finally(() => {
+        setIsAnalyzingNote(null);
+      });
   };
 
   const analyzeNoteManually = async (noteId: string, content: string) => {
@@ -2397,7 +2415,9 @@ export default function KnowledgePage() {
                             
                             <div className="flex items-center space-x-2 ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button 
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
                                   if (noteAnalysis[note.id]) {
                                     // If analysis exists, toggle showing/hiding
                                     setShowingAIAnalysis(showingAIAnalysis === note.id ? null : note.id);
