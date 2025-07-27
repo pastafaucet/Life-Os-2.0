@@ -2070,7 +2070,12 @@ export default function KnowledgePage() {
                     <span className="text-2xl">{category.icon}</span>
                     <div className="flex-1">
                       <h3 className="font-medium text-white group-hover:text-purple-400 transition-colors">{category.name}</h3>
-                      <p className="text-sm text-gray-400">{categoryNotes.length} notes</p>
+                      <div className="flex items-center space-x-2">
+                        <p className="text-sm text-gray-400">{categoryNotes.length} notes</p>
+                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                          {category.icon} {category.name}
+                        </span>
+                      </div>
                     </div>
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                       <span className="text-purple-400">→</span>
@@ -2110,15 +2115,17 @@ export default function KnowledgePage() {
                     <span className="text-2xl">🏷️</span>
                     <div className="flex-1">
                       <h3 className="font-medium text-white group-hover:text-orange-400 transition-colors">{topic.name}</h3>
-                      <p className="text-sm text-gray-400">{topicNotes.length} notes</p>
+                      <div className="flex items-center space-x-2">
+                        <p className="text-sm text-gray-400">{topicNotes.length} notes</p>
+                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                          ~ {topic.name}
+                        </span>
+                      </div>
                     </div>
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                       <span className="text-orange-400">→</span>
                     </div>
                   </div>
-                  {topic.description && (
-                    <p className="text-sm text-gray-500 mb-3">{topic.description}</p>
-                  )}
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {topicNotes.slice(0, 5).map((note) => (
                       <div key={note.id} className="p-2 bg-gray-800/30 rounded-lg">
