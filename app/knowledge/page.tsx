@@ -80,6 +80,9 @@ export default function KnowledgePage() {
   
   // Note expansion state
   const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
+  
+  // Interactive subtitle state
+  const [subtitleMode, setSubtitleMode] = useState(0); // 0=default, 1=notes, 2=articles, 3=references, 4=documents
 
   useEffect(() => {
     LocalStorage.initialize();
@@ -142,7 +145,7 @@ export default function KnowledgePage() {
       const createdNote = LocalStorage.createNote({
         title: noteTitle,
         content: noteContent,
-        categoryId: selectedCategory || (categories.find(cat => cat.name === 'General')?.id || 'general'),
+        categoryId: selectedCategory || (categories.find(cat => cat.name === 'Notes')?.id || categories[0]?.id || 'notes-default'),
         linkedTopicIds: [],
         linkedCaseIds: linkedCases,
         linkedPersonIds: linkedPeople,
@@ -246,17 +249,22 @@ export default function KnowledgePage() {
       
       // Auto-detect category based on keywords
       const content = newNote.toLowerCase();
-      let detectedCategory = categories.find(cat => cat.name === 'General')?.id || 'general';
+      let detectedCategory = categories.find(cat => cat.name === 'Notes')?.id || categories[0]?.id || 'notes-default';
       
-      if (content.includes('meeting') || content.includes('call') || content.includes('discussed')) {
-        detectedCategory = categories.find(cat => cat.name === 'Meeting Notes')?.id || detectedCategory;
-      } else if (content.includes('case') || content.includes('client') || content.includes('legal')) {
-        detectedCategory = categories.find(cat => cat.name === 'Case Notes')?.id || detectedCategory;
-      } else if (content.includes('article') || content.includes('link') || content.includes('http')) {
+      // Map keywords to the 4 core categories
+      if (content.includes('article') || content.includes('link') || content.includes('http') || 
+          content.includes('url') || content.includes('blog') || content.includes('news') || 
+          content.includes('read')) {
         detectedCategory = categories.find(cat => cat.name === 'Articles')?.id || detectedCategory;
-      } else if (content.includes('idea') || content.includes('think') || content.includes('consider')) {
-        detectedCategory = categories.find(cat => cat.name === 'Ideas')?.id || detectedCategory;
+      } else if (content.includes('reference') || content.includes('ref') || content.includes('guide') || 
+                 content.includes('manual') || content.includes('resource') || content.includes('documentation')) {
+        detectedCategory = categories.find(cat => cat.name === 'References')?.id || detectedCategory;
+      } else if (content.includes('document') || content.includes('file') || content.includes('pdf') || 
+                 content.includes('contract') || content.includes('agreement') || content.includes('report') || 
+                 content.includes('legal')) {
+        detectedCategory = categories.find(cat => cat.name === 'Documents')?.id || detectedCategory;
       }
+      // Everything else (including meeting, call, idea, think, etc.) goes to Notes (default)
       
       // Create clean title - only keep people names, remove everything else that's parsable
       let cleanTitle = newNote;
@@ -595,7 +603,10 @@ export default function KnowledgePage() {
   );
   
   const knowledgeHealth = Math.round(
-    ((notes.filter(note => note.categoryId !== 'general').length / Math.max(totalNotes, 1)) * 40) +
+    ((notes.filter(note => {
+      const notesCategory = categories.find(cat => cat.name === 'Notes');
+      return note.categoryId !== notesCategory?.id;
+    }).length / Math.max(totalNotes, 1)) * 40) +
     ((linkedItemsCount / Math.max(totalNotes, 1)) * 30) +
     ((notes.filter(note => note.tags.length > 0).length / Math.max(totalNotes, 1)) * 30)
   );
@@ -709,6 +720,43 @@ export default function KnowledgePage() {
   // Get unique tags for suggestions
   const allTags = Array.from(new Set(notes.flatMap(note => note.tags)));
 
+  // Interactive subtitle functionality
+  const subtitleTexts = [
+    "Your personal knowledge management system",
+    "📋 Notes - General notes and thoughts", 
+    "📰 Articles - Saved articles and external content",
+    "🔗 References - Links and reference materials",
+    "📄 Documents - Important documents and files"
+  ];
+
+  const cycleSubtitle = () => {
+    console.log('Cycling subtitle from', subtitleMode, 'to', (subtitleMode + 1) % subtitleTexts.length);
+    setSubtitleMode((prev) => (prev + 1) % subtitleTexts.length);
+  };
+
+  const cycleCategoryForNote = (noteId: string) => {
+    const note = notes.find(n => n.id === noteId);
+    if (!note || categories.length === 0) return;
+
+    // Find current category index
+    const currentCategoryIndex = categories.findIndex(cat => cat.id === note.categoryId);
+    
+    // Calculate next category index (loop back to 0 if at end)
+    const nextCategoryIndex = (currentCategoryIndex + 1) % categories.length;
+    const nextCategory = categories[nextCategoryIndex];
+
+    // Update the note's category
+    LocalStorage.updateNote(noteId, { 
+      categoryId: nextCategory.id,
+      updatedAt: new Date().toISOString()
+    });
+
+    // Reload data to reflect changes
+    loadData();
+    
+    console.log(`Cycled note ${noteId} from ${categories[currentCategoryIndex]?.name} to ${nextCategory.name}`);
+  };
+
   if (!initialized) {
     return (
       <div className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center">
@@ -730,14 +778,31 @@ export default function KnowledgePage() {
               Knowledge Hub
             </h1>
           </div>
-          <p className="text-gray-400">
-            Your personal knowledge management system • {new Date().toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
-          </p>
+          <div className="flex items-center gap-4">
+            <p className="text-gray-400 flex items-center gap-2">
+              <span>{subtitleTexts[subtitleMode]}</span>
+              <span className="text-xs opacity-70">• {new Date().toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}</span>
+            </p>
+            <button
+              onClick={() => {
+                console.log('Button clicked! Current mode:', subtitleMode);
+                setSubtitleMode((prev) => {
+                  const nextMode = (prev + 1) % subtitleTexts.length;
+                  console.log('Changing from', prev, 'to', nextMode);
+                  return nextMode;
+                });
+              }}
+              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs rounded-lg transition-all"
+              title="Click to cycle through categories"
+            >
+              ↻ Cycle
+            </button>
+          </div>
         </div>
 
         {/* Enhanced Stats Grid */}
@@ -785,10 +850,10 @@ export default function KnowledgePage() {
               {/* Keyword Hints */}
               <div className="flex flex-col text-xs text-gray-500 space-y-1 min-w-[120px] border-l border-gray-700 pl-4">
                 <div className="font-medium text-gray-400 mb-1">Keywords:</div>
-                <div>📋 meeting, call</div>
-                <div>⚖️ case, client</div>
-                <div>📰 article, link</div>
-                <div>💡 idea, think</div>
+                <div>� article, link, blog</div>
+                <div>🔗 reference, guide</div>
+                <div>� document, pdf</div>
+                <div>� everything else</div>
               </div>
               
               {/* Symbols Reference */}
@@ -1206,8 +1271,16 @@ export default function KnowledgePage() {
                       <div className="mb-3">
                         <h3 className="text-lg font-semibold text-white mb-2 line-clamp-2 leading-tight">{note.title}</h3>
                         {category && (
-                          <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                          <span 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              cycleCategoryForNote(note.id);
+                            }}
+                            className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30 cursor-pointer hover:bg-purple-500/30 transition-all group/category"
+                            title="Click to cycle category"
+                          >
                             {category.icon} {category.name}
+                            <span className="ml-1 opacity-0 group-hover/category:opacity-100 transition-opacity text-xs">↻</span>
                           </span>
                         )}
                       </div>
@@ -1391,8 +1464,16 @@ export default function KnowledgePage() {
                               <div className="flex justify-between items-start">
                                 <div className="flex items-center space-x-2 flex-wrap gap-2">
                                   {category && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                                    <span 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        cycleCategoryForNote(note.id);
+                                      }}
+                                      className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30 cursor-pointer hover:bg-purple-500/30 transition-all group/category"
+                                      title="Click to cycle category"
+                                    >
                                       {category.icon} {category.name}
+                                      <span className="ml-1 opacity-0 group-hover/category:opacity-100 transition-opacity text-xs">↻</span>
                                     </span>
                                   )}
 
