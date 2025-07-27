@@ -2070,12 +2070,7 @@ export default function KnowledgePage() {
                     <span className="text-2xl">{category.icon}</span>
                     <div className="flex-1">
                       <h3 className="font-medium text-white group-hover:text-purple-400 transition-colors">{category.name}</h3>
-                      <div className="flex items-center space-x-2">
-                        <p className="text-sm text-gray-400">{categoryNotes.length} notes</p>
-                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                          {category.icon} {category.name}
-                        </span>
-                      </div>
+                      <p className="text-sm text-gray-400">{categoryNotes.length} notes</p>
                     </div>
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                       <span className="text-purple-400">→</span>
@@ -2085,7 +2080,12 @@ export default function KnowledgePage() {
                     {categoryNotes.slice(0, 5).map((note) => (
                       <div key={note.id} className="p-2 bg-gray-800/30 rounded-lg">
                         <p className="text-sm text-gray-300 truncate">{note.title}</p>
-                        <p className="text-xs text-gray-500">{new Date(note.updatedAt).toLocaleDateString()}</p>
+                        <div className="flex items-center justify-between">
+                          <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                            {category.icon} {category.name}
+                          </span>
+                          <p className="text-xs text-gray-500">{new Date(note.updatedAt).toLocaleDateString()}</p>
+                        </div>
                       </div>
                     ))}
                     {categoryNotes.length > 5 && (
@@ -2115,12 +2115,7 @@ export default function KnowledgePage() {
                     <span className="text-2xl">🏷️</span>
                     <div className="flex-1">
                       <h3 className="font-medium text-white group-hover:text-orange-400 transition-colors">{topic.name}</h3>
-                      <div className="flex items-center space-x-2">
-                        <p className="text-sm text-gray-400">{topicNotes.length} notes</p>
-                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                          ~ {topic.name}
-                        </span>
-                      </div>
+                      <p className="text-sm text-gray-400">{topicNotes.length} notes</p>
                     </div>
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                       <span className="text-orange-400">→</span>
@@ -2130,7 +2125,12 @@ export default function KnowledgePage() {
                     {topicNotes.slice(0, 5).map((note) => (
                       <div key={note.id} className="p-2 bg-gray-800/30 rounded-lg">
                         <p className="text-sm text-gray-300 truncate">{note.title}</p>
-                        <p className="text-xs text-gray-500">{new Date(note.updatedAt).toLocaleDateString()}</p>
+                        <div className="flex items-center justify-between">
+                          <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                            ~ {topic.name}
+                          </span>
+                          <p className="text-xs text-gray-500">{new Date(note.updatedAt).toLocaleDateString()}</p>
+                        </div>
                       </div>
                     ))}
                     {topicNotes.length > 5 && (
