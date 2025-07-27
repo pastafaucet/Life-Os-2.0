@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Categories - Life OS</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #fff; }
+        .section { margin: 20px 0; padding: 15px; background: #2a2a2a; border-radius: 8px; }
+        .category { margin: 10px 0; padding: 10px; background: #3a3a3a; border-radius: 4px; }
+        .note { margin: 5px 0; padding: 8px; background: #4a4a4a; border-radius: 4px; font-size: 12px; }
+        button { padding: 10px 20px; margin: 10px 5px; background: #6366f1; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #5855eb; }
+        button.danger { background: #dc2626; }
+        button.danger:hover { background: #b91c1c; }
+        .success { background: #059669; }
+        .success:hover { background: #047857; }
+    </style>
+</head>
+<body>
+    <h1>Life OS Categories Debug Tool</h1>
+    
+    <div class="section">
+        <h2>Current Categories in localStorage</h2>
+        <div id="categories-list"></div>
+        <button onclick="loadCategories()">Reload Categories</button>
+        <button onclick="loadNotes()">Load Notes</button>
+    </div>
+
+    <div class="section">
+        <h2>Notes by Category</h2>
+        <div id="notes-by-category"></div>
+    </div>
+
+    <div class="section">
+        <h2>Fix Actions</h2>
+        <button onclick="removeUnwantedCategories()" class="danger">Remove "meeting notes" Category</button>
+        <button onclick="resetToDefaultCategories()" class="danger">Reset to Default 4 Categories</button>
+        <button onclick="reassignNotesToProperCategories()" class="success">Reassign Notes to Proper Categories</button>
+        <button onclick="fixAll()" class="success">Fix Everything</button>
+    </div>
+
+    <div class="section">
+        <h2>Log</h2>
+        <div id="log" style="background: #000; padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto;"></div>
+    </div>
+
+    <script>
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            logDiv.innerHTML += new Date().toLocaleTimeString() + ': ' + message + '<br>';
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        function loadCategories() {
+            const categories = JSON.parse(localStorage.getItem('lifeos-categories') || '[]');
+            log(`Found ${categories.length} categories in localStorage`);
+            
+            const categoriesDiv = document.getElementById('categories-list');
+            categoriesDiv.innerHTML = '';
+            
+            categories.forEach(cat => {
+                const div = document.createElement('div');
+                div.className = 'category';
+                div.innerHTML = `
+                    <strong>${cat.icon} ${cat.name}</strong> (ID: ${cat.id})<br>
+                    Color: ${cat.color}, Note Count: ${cat.noteCount}<br>
+                    Created: ${new Date(cat.createdAt).toLocaleString()}
+                `;
+                categoriesDiv.appendChild(div);
+                log(`Category: ${cat.name} (${cat.id})`);
+            });
+
+            return categories;
+        }
+
+        function loadNotes() {
+            const notes = JSON.parse(localStorage.getItem('lifeos-notes') || '[]');
+            const categories = JSON.parse(localStorage.getItem('lifeos-categories') || '[]');
+            
+            log(`Found ${notes.length} notes in localStorage`);
+            
+            const notesDiv = document.getElementById('notes-by-category');
+            notesDiv.innerHTML = '';
+            
+            // Group notes by category
+            const notesByCategory = {};
+            notes.forEach(note => {
+                if (!notesByCategory[note.categoryId]) {
+                    notesByCategory[note.categoryId] = [];
+                }
+                notesByCategory[note.categoryId].push(note);
+            });
+            
+            // Display notes grouped by category
+            Object.keys(notesByCategory).forEach(categoryId => {
+                const category = categories.find(c => c.id === categoryId);
+                const categoryName = category ? `${category.icon} ${category.name}` : `Unknown Category (${categoryId})`;
+                
+                const div = document.createElement('div');
+                div.className = 'category';
+                div.innerHTML = `<strong>${categoryName}</strong> (${notesByCategory[categoryId].length} notes)`;
+                
+                notesByCategory[categoryId].forEach(note => {
+                    const noteDiv = document.createElement('div');
+                    noteDiv.className = 'note';
+                    noteDiv.innerHTML = `"${note.title}" - ${new Date(note.createdAt).toLocaleDateString()}`;
+                    div.appendChild(noteDiv);
+                });
+                
+                notesDiv.appendChild(div);
+                log(`Category ${categoryName}: ${notesByCategory[categoryId].length} notes`);
+            });
+
+            return { notes, categories };
+        }
+
+        function removeUnwantedCategories() {
+            const categories = JSON.parse(localStorage.getItem('lifeos-categories') || '[]');
+            const validCategoryNames = ['Notes', 'References', 'Media', 'Documents'];
+            
+            const unwantedCategories = categories.filter(cat => !validCategoryNames.includes(cat.name));
+            log(`Found ${unwantedCategories.length} unwanted categories`);
+            
+            unwantedCategories.forEach(cat => {
+                log(`Removing unwanted category: ${cat.name} (${cat.id})`);
+            });
+            
+            const cleanCategories = categories.filter(cat => validCategoryNames.includes(cat.name));
+            localStorage.setItem('lifeos-categories', JSON.stringify(cleanCategories));
+            
+            log(`Cleaned categories. ${cleanCategories.length} categories remaining.`);
+            loadCategories();
+        }
+
+        function resetToDefaultCategories() {
+            const defaultCategories = [
+                {
+                    id: crypto.randomUUID(),
+                    name: 'Notes',
+                    color: '#3B82F6',
+                    icon: '📋',
+                    description: 'General notes and thoughts',
+                    noteCount: 0,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                },
+                {
+                    id: crypto.randomUUID(),
+                    name: 'References',
+                    color: '#F59E0B',
+                    icon: '�',
+                    description: 'Links and reference materials',
+                    noteCount: 0,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                },
+                {
+                    id: crypto.randomUUID(),
+                    name: 'Media',
+                    color: '#10B981',
+                    icon: '�',
+                    description: 'Videos, images, and media content',
+                    noteCount: 0,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                },
+                {
+                    id: crypto.randomUUID(),
+                    name: 'Documents',
+                    color: '#6B7280',
+                    icon: '📄',
+                    description: 'Important documents and files',
+                    noteCount: 0,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                }
+            ];
+
+            localStorage.setItem('lifeos-categories', JSON.stringify(defaultCategories));
+            log('Reset to correct 4 categories: Notes, References, Media, Documents');
+            loadCategories();
+            return defaultCategories;
+        }
+
+        function reassignNotesToProperCategories() {
+            const notes = JSON.parse(localStorage.getItem('lifeos-notes') || '[]');
+            const categories = JSON.parse(localStorage.getItem('lifeos-categories') || '[]');
+            
+            const notesCategory = categories.find(cat => cat.name === 'Notes');
+            if (!notesCategory) {
+                log('ERROR: Notes category not found! Please reset categories first.');
+                return;
+            }
+            
+            let reassignedCount = 0;
+            const updatedNotes = notes.map(note => {
+                const currentCategory = categories.find(cat => cat.id === note.categoryId);
+                
+                // If note has invalid category or is assigned to any old unwanted category
+                const validCategories = ['Notes', 'References', 'Media', 'Documents'];
+                if (!currentCategory || !validCategories.includes(currentCategory.name)) {
+                    log(`Reassigning note "${note.title}" from invalid category to Notes`);
+                    reassignedCount++;
+                    return {
+                        ...note,
+                        categoryId: notesCategory.id,
+                        updatedAt: new Date().toISOString()
+                    };
+                }
+                return note;
+            });
+            
+            localStorage.setItem('lifeos-notes', JSON.stringify(updatedNotes));
+            log(`Reassigned ${reassignedCount} notes to proper categories`);
+            
+            // Update category counts
+            updateCategoryCounts();
+            loadNotes();
+        }
+
+        function updateCategoryCounts() {
+            const categories = JSON.parse(localStorage.getItem('lifeos-categories') || '[]');
+            const notes = JSON.parse(localStorage.getItem('lifeos-notes') || '[]');
+            
+            const updatedCategories = categories.map(category => ({
+                ...category,
+                noteCount: notes.filter(note => note.categoryId === category.id).length
+            }));
+            
+            localStorage.setItem('lifeos-categories', JSON.stringify(updatedCategories));
+            log('Updated category counts');
+        }
+
+        function fixAll() {
+            log('=== STARTING COMPLETE FIX ===');
+            
+            // Step 1: Reset to default categories
+            const defaultCategories = resetToDefaultCategories();
+            
+            // Step 2: Reassign all notes to proper categories
+            reassignNotesToProperCategories();
+            
+            // Step 3: Update counts
+            updateCategoryCounts();
+            
+            log('=== FIX COMPLETE ===');
+            log('Please refresh your Knowledge Hub page to see the changes');
+            
+            // Reload display
+            loadCategories();
+            loadNotes();
+        }
+
+        // Auto-load on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            log('Categories Debug Tool loaded');
+            loadCategories();
+            loadNotes();
+        });
+    </script>
+</body>
+</html>

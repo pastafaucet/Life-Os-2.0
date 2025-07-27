@@ -83,36 +83,109 @@ export default function KnowledgePage() {
   
   // Interactive subtitle state
   const [subtitleMode, setSubtitleMode] = useState(0); // 0=default, 1=notes, 2=articles, 3=references, 4=documents
+  
+  // Modal editor state
+  const [isModalEditorOpen, setIsModalEditorOpen] = useState(false);
+  const [modalEditingNote, setModalEditingNote] = useState<{
+    id: string;
+    title: string;
+    content: string;
+    categoryId: string;
+    tags: string[];
+  } | null>(null);
+  const [modalStack, setModalStack] = useState<'category' | 'topic' | null>(null); // Track which modal opened the editor
+
+  // Category modal state
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [selectedCategoryForModal, setSelectedCategoryForModal] = useState<Category | null>(null);
+  const [categoryModalView, setCategoryModalView] = useState<'list' | 'grid'>('list');
+  const [categoryModalSort, setCategoryModalSort] = useState<'date' | 'title' | 'tags'>('date');
+  
+  // Topic modal state
+  const [isTopicModalOpen, setIsTopicModalOpen] = useState(false);
+  const [selectedTopicForModal, setSelectedTopicForModal] = useState<Topic | null>(null);
+  const [topicModalView, setTopicModalView] = useState<'list' | 'grid'>('list');
+  const [topicModalSort, setTopicModalSort] = useState<'date' | 'title' | 'tags'>('date');
 
   useEffect(() => {
     LocalStorage.initialize();
+    
+    // Clean up categories to only have the 4 core ones
+    LocalStorage.resetToCoreCategoriesOnly();
+    
     loadData();
     setInitialized(true);
   }, []);
 
-  // Keyboard shortcut: Ctrl+K to create new note
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Check for Ctrl+K (Windows/Linux) or Cmd+K (Mac)
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault(); // Prevent browser's default Ctrl+K behavior
-        event.stopPropagation();
+      // Modal editor shortcuts
+      if (isModalEditorOpen) {
+        // Ctrl+S or Cmd+S to save
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+          event.preventDefault();
+          saveModalEdit();
+          return;
+        }
         
-        console.log('Ctrl+K detected'); // Debug log
+        // ESC to cancel - only handle modal editor escape here
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          cancelModalEdit();
+          return;
+        }
+      }
+      
+      // Handle escape for other modals only when note editor is NOT open
+      if (!isModalEditorOpen && event.key === 'Escape') {
+        console.log('ESC pressed, modal states:', { isCategoryModalOpen, isTopicModalOpen });
         
-        // Focus the note input field with multiple selectors as fallback
-        const noteInput = document.querySelector('input[placeholder*="Capture a thought"]') as HTMLInputElement ||
-                         document.querySelector('input[placeholder*="capture"]') as HTMLInputElement ||
-                         document.querySelector('.note-input') as HTMLInputElement;
-                         
-        console.log('Found input:', noteInput); // Debug log
+        // Close category modal if open
+        if (isCategoryModalOpen) {
+          console.log('Closing category modal');
+          event.preventDefault();
+          event.stopPropagation();
+          setIsCategoryModalOpen(false);
+          setSelectedCategoryForModal(null);
+          return;
+        }
         
-        if (noteInput) {
-          noteInput.focus();
-          noteInput.select(); // Select any existing text
-          console.log('Input focused'); // Debug log
-        } else {
-          console.log('Input not found'); // Debug log
+        // Close topic modal if open
+        if (isTopicModalOpen) {
+          console.log('Closing topic modal');
+          event.preventDefault();
+          event.stopPropagation();
+          setIsTopicModalOpen(false);
+          setSelectedTopicForModal(null);
+          return;
+        }
+      }
+      
+      // Global shortcuts (only when modal is not open)
+      if (!isModalEditorOpen) {
+        // Check for Ctrl+K (Windows/Linux) or Cmd+K (Mac)
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+          event.preventDefault(); // Prevent browser's default Ctrl+K behavior
+          event.stopPropagation();
+          
+          console.log('Ctrl+K detected'); // Debug log
+          
+          // Focus the note input field with multiple selectors as fallback
+          const noteInput = document.querySelector('input[placeholder*="Capture a thought"]') as HTMLInputElement ||
+                           document.querySelector('input[placeholder*="capture"]') as HTMLInputElement ||
+                           document.querySelector('.note-input') as HTMLInputElement;
+                           
+          console.log('Found input:', noteInput); // Debug log
+          
+          if (noteInput) {
+            noteInput.focus();
+            noteInput.select(); // Select any existing text
+            console.log('Input focused'); // Debug log
+          } else {
+            console.log('Input not found'); // Debug log
+          }
         }
       }
     };
@@ -124,7 +197,7 @@ export default function KnowledgePage() {
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, []);
+  }, [isModalEditorOpen, isCategoryModalOpen, isTopicModalOpen]);
 
   const loadData = () => {
     setNotes(LocalStorage.getNotes());
@@ -249,20 +322,27 @@ export default function KnowledgePage() {
       
       // Auto-detect category based on keywords
       const content = newNote.toLowerCase();
-      let detectedCategory = categories.find(cat => cat.name === 'Notes')?.id || categories[0]?.id || 'notes-default';
       
-      // Map keywords to the 4 core categories
-      if (content.includes('article') || content.includes('link') || content.includes('http') || 
-          content.includes('url') || content.includes('blog') || content.includes('news') || 
-          content.includes('read')) {
-        detectedCategory = categories.find(cat => cat.name === 'Articles')?.id || detectedCategory;
+      // Find the exact "Notes" category (not "Meeting Notes" or others)
+      const notesCategory = categories.find(cat => cat.name === 'Notes' && cat.name.length === 5);
+      let detectedCategory = notesCategory?.id || categories.find(cat => cat.name === 'Notes')?.id || categories[0]?.id || 'notes-default';
+      
+      // Map keywords to the 4 core categories only
+      if (content.includes('video') || content.includes('image') || content.includes('media') || 
+          content.includes('photo') || content.includes('youtube') || content.includes('vimeo') || 
+          content.includes('watch') || content.includes('podcast')) {
+        const mediaCategory = categories.find(cat => cat.name === 'Media');
+        if (mediaCategory) detectedCategory = mediaCategory.id;
       } else if (content.includes('reference') || content.includes('ref') || content.includes('guide') || 
-                 content.includes('manual') || content.includes('resource') || content.includes('documentation')) {
-        detectedCategory = categories.find(cat => cat.name === 'References')?.id || detectedCategory;
+                 content.includes('manual') || content.includes('resource') || content.includes('documentation') ||
+                 content.includes('link') || content.includes('http') || content.includes('url')) {
+        const referencesCategory = categories.find(cat => cat.name === 'References');
+        if (referencesCategory) detectedCategory = referencesCategory.id;
       } else if (content.includes('document') || content.includes('file') || content.includes('pdf') || 
                  content.includes('contract') || content.includes('agreement') || content.includes('report') || 
                  content.includes('legal')) {
-        detectedCategory = categories.find(cat => cat.name === 'Documents')?.id || detectedCategory;
+        const documentsCategory = categories.find(cat => cat.name === 'Documents');
+        if (documentsCategory) detectedCategory = documentsCategory.id;
       }
       // Everything else (including meeting, call, idea, think, etc.) goes to Notes (default)
       
@@ -334,11 +414,91 @@ export default function KnowledgePage() {
     loadData();
   };
 
-  const startEditing = (note: Note) => {
-    setEditingNoteId(note.id);
-    setEditingNote({ title: note.title, content: note.content });
+  const startEditing = (note: Note, fromModal?: 'category' | 'topic') => {
+    // Use modal editor instead of inline editing
+    setModalEditingNote({
+      id: note.id,
+      title: note.title,
+      content: note.content,
+      categoryId: note.categoryId,
+      tags: note.tags
+    });
+    setModalStack(fromModal || null);
+    setIsModalEditorOpen(true);
   };
 
+  const saveModalEdit = async () => {
+    if (!modalEditingNote) return;
+    
+    if (modalEditingNote.id) {
+      // Update existing note
+      LocalStorage.updateNote(modalEditingNote.id, {
+        title: modalEditingNote.title,
+        content: modalEditingNote.content,
+        categoryId: modalEditingNote.categoryId,
+        tags: modalEditingNote.tags,
+        updatedAt: new Date().toISOString()
+      });
+    } else {
+      // Create new note
+      const createdNote = LocalStorage.createNote({
+        title: modalEditingNote.title,
+        content: modalEditingNote.content,
+        categoryId: modalEditingNote.categoryId,
+        tags: modalEditingNote.tags
+      });
+
+      // Analyze the note with AI if it has meaningful content
+      if (modalEditingNote.content.trim().length > 10) {
+        try {
+          setIsAnalyzingNote(createdNote.id);
+          const analysis = await analyzeNote(modalEditingNote.content);
+          setNoteAnalysis(prev => ({
+            ...prev,
+            [createdNote.id]: analysis
+          }));
+        } catch (error) {
+          console.error('Failed to analyze note:', error);
+        } finally {
+          setIsAnalyzingNote(null);
+        }
+      }
+    }
+    
+    setIsModalEditorOpen(false);
+    setModalEditingNote(null);
+    setModalStack(null);
+    loadData();
+  };
+
+  const startCapture = () => {
+    // Use modal editor for creating new notes
+    setModalEditingNote({
+      id: '', // Empty ID means new note
+      title: '',
+      content: '',
+      categoryId: categories.find(cat => cat.name === 'Notes')?.id || categories[0]?.id || '',
+      tags: []
+    });
+    setIsModalEditorOpen(true);
+  };
+
+  const cancelModalEdit = () => {
+    setIsModalEditorOpen(false);
+    setModalEditingNote(null);
+    
+    // If we came from a category/topic modal, go back to it
+    if (modalStack === 'category') {
+      // Category modal should already be open
+      setModalStack(null);
+    } else if (modalStack === 'topic') {
+      // Topic modal should already be open
+      setModalStack(null);
+    }
+    // If no modal stack, we just close everything
+  };
+
+  // Legacy inline editing functions (kept for compatibility)
   const saveEdit = () => {
     if (!editingNoteId) return;
     
@@ -724,8 +884,8 @@ export default function KnowledgePage() {
   const subtitleTexts = [
     "Your personal knowledge management system",
     "📋 Notes - General notes and thoughts", 
-    "📰 Articles - Saved articles and external content",
-    "🔗 References - Links and reference materials",
+    "� References - Links and reference materials",
+    "� Media - Videos, images, and media content",
     "📄 Documents - Important documents and files"
   ];
 
@@ -736,14 +896,21 @@ export default function KnowledgePage() {
 
   const cycleCategoryForNote = (noteId: string) => {
     const note = notes.find(n => n.id === noteId);
-    if (!note || categories.length === 0) return;
+    if (!note) return;
 
-    // Find current category index
-    const currentCategoryIndex = categories.findIndex(cat => cat.id === note.categoryId);
+    // Only cycle through the 4 core categories
+    const coreCategories = ['Notes', 'References', 'Media', 'Documents'];
+    const availableCategories = categories.filter(cat => coreCategories.includes(cat.name));
+    
+    if (availableCategories.length === 0) return;
+
+    // Find current category in core categories
+    const currentCategory = categories.find(cat => cat.id === note.categoryId);
+    const currentIndex = availableCategories.findIndex(cat => cat.id === currentCategory?.id);
     
     // Calculate next category index (loop back to 0 if at end)
-    const nextCategoryIndex = (currentCategoryIndex + 1) % categories.length;
-    const nextCategory = categories[nextCategoryIndex];
+    const nextIndex = (currentIndex + 1) % availableCategories.length;
+    const nextCategory = availableCategories[nextIndex];
 
     // Update the note's category
     LocalStorage.updateNote(noteId, { 
@@ -754,7 +921,7 @@ export default function KnowledgePage() {
     // Reload data to reflect changes
     loadData();
     
-    console.log(`Cycled note ${noteId} from ${categories[currentCategoryIndex]?.name} to ${nextCategory.name}`);
+    console.log(`Cycled note ${noteId} from ${currentCategory?.name || 'Unknown'} to ${nextCategory.name}`);
   };
 
   if (!initialized) {
@@ -769,228 +936,663 @@ export default function KnowledgePage() {
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <Navigation />
       
+      {/* Category Detail Modal */}
+      {isCategoryModalOpen && selectedCategoryForModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-6xl max-h-[90vh] flex flex-col shadow-2xl">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-700">
+              <div className="flex items-center space-x-4">
+                <span className="text-3xl">{selectedCategoryForModal.icon}</span>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">{selectedCategoryForModal.name}</h2>
+                  <p className="text-gray-400">{selectedCategoryForModal.description}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCategoryModalOpen(false)}
+                className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-all"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Controls */}
+            <div className="p-6 border-b border-gray-700 bg-gray-800/30">
+              <div className="flex items-center justify-between">
+                {/* Metrics */}
+                <div className="flex items-center space-x-6">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-white">
+                      {notes.filter(note => note.categoryId === selectedCategoryForModal.id).length}
+                    </div>
+                    <div className="text-xs text-gray-400">Total Notes</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-400">
+                      {notes.filter(note => {
+                        const noteDate = new Date(note.createdAt);
+                        const weekAgo = new Date();
+                        weekAgo.setDate(weekAgo.getDate() - 7);
+                        return note.categoryId === selectedCategoryForModal.id && noteDate >= weekAgo;
+                      }).length}
+                    </div>
+                    <div className="text-xs text-gray-400">This Week</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-400">
+                      {Array.from(new Set(notes.filter(note => note.categoryId === selectedCategoryForModal.id)
+                        .flatMap(note => note.tags))).length}
+                    </div>
+                    <div className="text-xs text-gray-400">Unique Tags</div>
+                  </div>
+                </div>
+
+                {/* View Controls */}
+                <div className="flex items-center space-x-4">
+                  {/* Sort Options */}
+                  <select
+                    value={categoryModalSort}
+                    onChange={(e) => setCategoryModalSort(e.target.value as 'date' | 'title' | 'tags')}
+                    className="px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm"
+                  >
+                    <option value="date">Sort by Date</option>
+                    <option value="title">Sort by Title</option>
+                    <option value="tags">Sort by Tags</option>
+                  </select>
+
+                  {/* View Toggle */}
+                  <div className="flex items-center space-x-1 bg-gray-800 border border-gray-600 rounded-lg p-1">
+                    <button
+                      onClick={() => setCategoryModalView('list')}
+                      className={`p-2 rounded transition-all ${
+                        categoryModalView === 'list' 
+                          ? 'bg-purple-500 text-white' 
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      📋
+                    </button>
+                    <button
+                      onClick={() => setCategoryModalView('grid')}
+                      className={`p-2 rounded transition-all ${
+                        categoryModalView === 'grid' 
+                          ? 'bg-purple-500 text-white' 
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      ⊞
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 p-6 overflow-y-auto">
+              {(() => {
+                let categoryNotes = notes.filter(note => note.categoryId === selectedCategoryForModal.id);
+                
+                // Apply sorting
+                categoryNotes = categoryNotes.sort((a, b) => {
+                  switch (categoryModalSort) {
+                    case 'title':
+                      return a.title.localeCompare(b.title);
+                    case 'tags':
+                      return b.tags.length - a.tags.length;
+                    case 'date':
+                    default:
+                      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+                  }
+                });
+
+                if (categoryNotes.length === 0) {
+                  return (
+                    <div className="text-center py-12 text-gray-500">
+                      <span className="text-4xl mb-4 block">{selectedCategoryForModal.icon}</span>
+                      <h3 className="text-lg font-medium mb-2">No notes in this category yet</h3>
+                      <p className="text-sm">Create some notes to see them here</p>
+                    </div>
+                  );
+                }
+
+                if (categoryModalView === 'grid') {
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {categoryNotes.map((note) => (
+                        <div key={note.id} className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 hover:border-gray-600 transition-all cursor-pointer" onClick={() => startEditing(note, 'category')}>
+                          <h4 className="font-medium text-white mb-2 line-clamp-2">{note.title}</h4>
+                          {note.content && (
+                            <p className="text-sm text-gray-400 mb-3 line-clamp-3">{note.content}</p>
+                          )}
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            {note.tags.slice(0, 3).map((tag, index) => (
+                              <span key={index} className="text-xs px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full">
+                                +{tag}
+                              </span>
+                            ))}
+                            {note.tags.length > 3 && (
+                              <span className="text-xs text-gray-500">+{note.tags.length - 3} more</span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-500">
+                              {new Date(note.updatedAt).toLocaleDateString()}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startEditing(note, 'category');
+                              }}
+                              className="p-1 text-gray-500 hover:text-blue-400 transition-colors"
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="space-y-3">
+                      {categoryNotes.map((note) => (
+                        <div key={note.id} className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 hover:border-gray-600 transition-all cursor-pointer" onClick={() => startEditing(note, 'category')}>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-medium text-white mb-2">{note.title}</h4>
+                              {note.content && (
+                                <p className="text-sm text-gray-400 mb-3 line-clamp-2">{note.content}</p>
+                              )}
+                              <div className="flex flex-wrap gap-2">
+                                {note.tags.map((tag, index) => (
+                                  <span key={index} className="text-xs px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full">
+                                    +{tag}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-3 ml-4">
+                              <span className="text-xs text-gray-500">
+                                {new Date(note.updatedAt).toLocaleDateString()}
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startEditing(note, 'category');
+                                }}
+                                className="p-2 text-gray-500 hover:text-blue-400 transition-colors"
+                              >
+                                <Edit3 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                }
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Topic Detail Modal */}
+      {isTopicModalOpen && selectedTopicForModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-6xl max-h-[90vh] flex flex-col shadow-2xl">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-700">
+              <div className="flex items-center space-x-4">
+                <span className="text-3xl">🏷️</span>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">{selectedTopicForModal.name}</h2>
+                  <p className="text-gray-400">{selectedTopicForModal.description}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsTopicModalOpen(false)}
+                className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-all"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Controls */}
+            <div className="p-6 border-b border-gray-700 bg-gray-800/30">
+              <div className="flex items-center justify-between">
+                {/* Metrics */}
+                <div className="flex items-center space-x-6">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-white">
+                      {notes.filter(note => note.linkedTopicIds.includes(selectedTopicForModal.id)).length}
+                    </div>
+                    <div className="text-xs text-gray-400">Total Notes</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-400">
+                      {notes.filter(note => {
+                        const noteDate = new Date(note.createdAt);
+                        const weekAgo = new Date();
+                        weekAgo.setDate(weekAgo.getDate() - 7);
+                        return note.linkedTopicIds.includes(selectedTopicForModal.id) && noteDate >= weekAgo;
+                      }).length}
+                    </div>
+                    <div className="text-xs text-gray-400">This Week</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-orange-400">
+                      {Array.from(new Set(notes.filter(note => note.linkedTopicIds.includes(selectedTopicForModal.id))
+                        .flatMap(note => note.tags))).length}
+                    </div>
+                    <div className="text-xs text-gray-400">Unique Tags</div>
+                  </div>
+                </div>
+
+                {/* View Controls */}
+                <div className="flex items-center space-x-4">
+                  {/* Sort Options */}
+                  <select
+                    value={topicModalSort}
+                    onChange={(e) => setTopicModalSort(e.target.value as 'date' | 'title' | 'tags')}
+                    className="px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm"
+                  >
+                    <option value="date">Sort by Date</option>
+                    <option value="title">Sort by Title</option>
+                    <option value="tags">Sort by Tags</option>
+                  </select>
+
+                  {/* View Toggle */}
+                  <div className="flex items-center space-x-1 bg-gray-800 border border-gray-600 rounded-lg p-1">
+                    <button
+                      onClick={() => setTopicModalView('list')}
+                      className={`p-2 rounded transition-all ${
+                        topicModalView === 'list' 
+                          ? 'bg-purple-500 text-white' 
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      📋
+                    </button>
+                    <button
+                      onClick={() => setTopicModalView('grid')}
+                      className={`p-2 rounded transition-all ${
+                        topicModalView === 'grid' 
+                          ? 'bg-purple-500 text-white' 
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      ⊞
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 p-6 overflow-y-auto">
+              {(() => {
+                let topicNotes = notes.filter(note => note.linkedTopicIds.includes(selectedTopicForModal.id));
+                
+                // Apply sorting
+                topicNotes = topicNotes.sort((a, b) => {
+                  switch (topicModalSort) {
+                    case 'title':
+                      return a.title.localeCompare(b.title);
+                    case 'tags':
+                      return b.tags.length - a.tags.length;
+                    case 'date':
+                    default:
+                      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+                  }
+                });
+
+                if (topicNotes.length === 0) {
+                  return (
+                    <div className="text-center py-12 text-gray-500">
+                      <span className="text-4xl mb-4 block">🏷️</span>
+                      <h3 className="text-lg font-medium mb-2">No notes with this topic yet</h3>
+                      <p className="text-sm">Create notes with ~{selectedTopicForModal.name} to see them here</p>
+                    </div>
+                  );
+                }
+
+                if (topicModalView === 'grid') {
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {topicNotes.map((note) => {
+                        const category = categories.find(cat => cat.id === note.categoryId);
+                        return (
+                          <div key={note.id} className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 hover:border-gray-600 transition-all cursor-pointer" onClick={() => startEditing(note, 'topic')}>
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-medium text-white line-clamp-2 flex-1">{note.title}</h4>
+                              {category && (
+                                <span className="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded ml-2">
+                                  {category.icon}
+                                </span>
+                              )}
+                            </div>
+                            {note.content && (
+                              <p className="text-sm text-gray-400 mb-3 line-clamp-3">{note.content}</p>
+                            )}
+                            <div className="flex flex-wrap gap-1 mb-3">
+                              {note.tags.slice(0, 3).map((tag, index) => (
+                                <span key={index} className="text-xs px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full">
+                                  +{tag}
+                                </span>
+                              ))}
+                              {note.tags.length > 3 && (
+                                <span className="text-xs text-gray-500">+{note.tags.length - 3} more</span>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-gray-500">
+                                {new Date(note.updatedAt).toLocaleDateString()}
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startEditing(note, 'topic');
+                                }}
+                                className="p-1 text-gray-500 hover:text-blue-400 transition-colors"
+                              >
+                                <Edit3 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="space-y-3">
+                      {topicNotes.map((note) => {
+                        const category = categories.find(cat => cat.id === note.categoryId);
+                        return (
+                          <div key={note.id} className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 hover:border-gray-600 transition-all cursor-pointer" onClick={() => startEditing(note, 'topic')}>
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <h4 className="font-medium text-white">{note.title}</h4>
+                                  {category && (
+                                    <span className="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded">
+                                      {category.icon} {category.name}
+                                    </span>
+                                  )}
+                                </div>
+                                {note.content && (
+                                  <p className="text-sm text-gray-400 mb-3 line-clamp-2">{note.content}</p>
+                                )}
+                                <div className="flex flex-wrap gap-2">
+                                  {note.tags.map((tag, index) => (
+                                    <span key={index} className="text-xs px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full">
+                                      +{tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-3 ml-4">
+                                <span className="text-xs text-gray-500">
+                                  {new Date(note.updatedAt).toLocaleDateString()}
+                                </span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    startEditing(note, 'topic');
+                                  }}
+                                  className="p-2 text-gray-500 hover:text-blue-400 transition-colors"
+                                >
+                                  <Edit3 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                }
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editor */}
+      {isModalEditorOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-700">
+              <div className="flex items-center space-x-3">
+                {modalEditingNote?.id ? (
+                  <>
+                    <Edit3 className="h-6 w-6 text-purple-400" />
+                    <h2 className="text-xl font-semibold text-white">Edit Note</h2>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-6 w-6 text-purple-400" />
+                    <h2 className="text-xl font-semibold text-white">Capture Note</h2>
+                  </>
+                )}
+                <div className="text-sm text-gray-400">
+                  {modalEditingNote?.title ? modalEditingNote.title.length : 0} + {modalEditingNote?.content ? modalEditingNote.content.length : 0} characters
+                </div>
+              </div>
+              <button
+                onClick={cancelModalEdit}
+                className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-all"
+                title="Close (ESC)"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 p-6 space-y-4 overflow-y-auto">
+              {/* Title Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
+                <input
+                  type="text"
+                  value={modalEditingNote?.title || ''}
+                  onChange={(e) => modalEditingNote && setModalEditingNote({
+                    ...modalEditingNote,
+                    title: e.target.value
+                  })}
+                  placeholder="Note title..."
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white text-lg font-medium transition-all"
+                  autoFocus
+                />
+              </div>
+
+              {/* Category Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
+                <select
+                  value={modalEditingNote?.categoryId || ''}
+                  onChange={(e) => modalEditingNote && setModalEditingNote({
+                    ...modalEditingNote,
+                    categoryId: e.target.value
+                  })}
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white transition-all"
+                >
+                  {categories.filter(cat => ['Notes', 'References', 'Media', 'Documents'].includes(cat.name)).map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Content Field - Auto-expanding */}
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-300 mb-2">Content</label>
+                <textarea
+                  value={modalEditingNote?.content || ''}
+                  onChange={(e) => {
+                    if (modalEditingNote) {
+                      setModalEditingNote({
+                        ...modalEditingNote,
+                        content: e.target.value
+                      });
+                    }
+                    // Auto-expand textarea
+                    const textarea = e.target as HTMLTextAreaElement;
+                    textarea.style.height = 'auto';
+                    textarea.style.height = Math.max(200, Math.min(600, textarea.scrollHeight)) + 'px';
+                  }}
+                  placeholder="Write your note content here... You can write as much as you need!"
+                  className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white leading-relaxed transition-all resize-none"
+                  style={{ minHeight: '200px' }}
+                  rows={8}
+                />
+                <div className="text-xs text-gray-500 mt-2">
+                  {modalEditingNote.content ? modalEditingNote.content.split(' ').length : 0} words • {modalEditingNote.content ? modalEditingNote.content.length : 0} characters
+                </div>
+              </div>
+
+              {/* Tags Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Tags</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {modalEditingNote.tags.map((tag, index) => (
+                    <span
+                      key={index}
+                      className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                    >
+                      {tag}
+                      <button
+                        onClick={() => {
+                          const updatedTags = modalEditingNote.tags.filter((_, i) => i !== index);
+                          setModalEditingNote({
+                            ...modalEditingNote,
+                            tags: updatedTags
+                          });
+                        }}
+                        className="ml-2 text-purple-400 hover:text-purple-200 text-lg leading-none"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  placeholder="Add tags (press Enter to add)..."
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white transition-all"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const input = e.target as HTMLInputElement;
+                      const newTag = input.value.trim();
+                      if (newTag && !modalEditingNote.tags.includes(newTag)) {
+                        setModalEditingNote({
+                          ...modalEditingNote,
+                          tags: [...modalEditingNote.tags, newTag]
+                        });
+                        input.value = '';
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between p-6 border-t border-gray-700 bg-gray-800/50">
+              <div className="text-sm text-gray-400">
+                💡 Pro tip: Use <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">Ctrl+S</kbd> to save, <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">ESC</kbd> to cancel
+              </div>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={cancelModalEdit}
+                  className="flex items-center space-x-2 px-4 py-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-xl transition-all"
+                >
+                  <X className="h-4 w-4" />
+                  <span>Cancel</span>
+                </button>
+                <button
+                  onClick={saveModalEdit}
+                  className="flex items-center space-x-2 px-6 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-xl transition-all font-medium"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Save Changes</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="max-w-[1400px] mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center space-x-3 mb-2">
+        {/* Compact Header with Stats */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-3">
             <Brain className="h-8 w-8 text-purple-400" />
             <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
               Knowledge Hub
             </h1>
           </div>
-          <div className="flex items-center gap-4">
-            <p className="text-gray-400 flex items-center gap-2">
-              <span>{subtitleTexts[subtitleMode]}</span>
-              <span className="text-xs opacity-70">• {new Date().toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}</span>
-            </p>
-            <button
-              onClick={() => {
-                console.log('Button clicked! Current mode:', subtitleMode);
-                setSubtitleMode((prev) => {
-                  const nextMode = (prev + 1) % subtitleTexts.length;
-                  console.log('Changing from', prev, 'to', nextMode);
-                  return nextMode;
-                });
-              }}
-              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs rounded-lg transition-all"
-              title="Click to cycle through categories"
-            >
-              ↻ Cycle
-            </button>
+          
+          {/* Compact Stats */}
+          <div className="flex items-center space-x-8">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white">{totalNotes}</div>
+              <div className="text-xs text-gray-400">Total Notes</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-400">+{notesToday}</div>
+              <div className="text-xs text-gray-400">This Week</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-purple-400">{categories.length}</div>
+              <div className="text-xs text-gray-400">Categories</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-orange-400">{topics.length}</div>
+              <div className="text-xs text-gray-400">Topics</div>
+            </div>
           </div>
         </div>
 
-        {/* Enhanced Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-          {knowledgeStats.map((stat, index) => (
-            <div 
-              key={index} 
-              className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 transition-all hover:transform hover:-translate-y-1"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <p className="text-xs text-gray-500 mb-1">{stat.label}</p>
-                  <p className="text-2xl font-bold text-white">{stat.value}</p>
-                  <div className={`text-xs flex items-center gap-1 ${
-                    stat.changeType === 'positive' ? 'text-green-400' : 
-                    stat.changeType === 'negative' ? 'text-red-400' : 'text-gray-400'
-                  }`}>
-                    {stat.changeType === 'positive' && <span>↑</span>}
-                    {stat.changeType === 'negative' && <span>↓</span>}
-                    {stat.changeType === 'neutral' && <span>→</span>}
-                    <span>{stat.change}</span>
-                  </div>
-                </div>
-                <div className={`w-10 h-10 rounded-lg ${stat.iconBg} flex items-center justify-center text-lg`}>
-                  {stat.emoji}
-                </div>
-              </div>
-            </div>
-          ))}
+        {/* Quick Action Bar */}
+        <div className="flex items-center space-x-4 mb-6">
+          <button
+            onClick={startCapture}
+            className="flex items-center space-x-2 px-6 py-3 bg-blue-500 hover:bg-blue-600 rounded-xl transition-all font-medium"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Capture</span>
+          </button>
+          
+          <div className="flex-1">
+            <input
+              type="text"
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && createNote()}
+              placeholder="Quick note title (press Enter to create)..."
+              className="w-full px-4 py-3 bg-gray-900/50 border border-gray-800/50 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-gray-700 transition-all placeholder-gray-500 text-white note-input"
+            />
+          </div>
+
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search your notes..."
+              className="w-full pl-10 pr-4 py-3 bg-gray-900/50 border border-gray-800/50 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-gray-700 transition-all placeholder-gray-500 text-white"
+            />
+          </div>
         </div>
 
-        {/* Enhanced Note Creation */}
-        <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-6 mb-6">
-          {!showAdvancedForm ? (
-            <div className="flex items-center space-x-4">
-              <input
-                type="text"
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && createNote()}
-                placeholder="Capture a thought, idea, or note... (auto-detects category)"
-                className="flex-1 bg-transparent border-none outline-none text-white placeholder-gray-500 text-lg note-input"
-              />
-              
-              {/* Keyword Hints */}
-              <div className="flex flex-col text-xs text-gray-500 space-y-1 min-w-[120px] border-l border-gray-700 pl-4">
-                <div className="font-medium text-gray-400 mb-1">Keywords:</div>
-                <div>� article, link, blog</div>
-                <div>🔗 reference, guide</div>
-                <div>� document, pdf</div>
-                <div>� everything else</div>
-              </div>
-              
-              {/* Symbols Reference */}
-              <div className="flex flex-col text-xs text-gray-500 space-y-1 min-w-[100px] border-l border-gray-700 pl-4">
-                <div className="font-medium text-gray-400 mb-1">Symbols:</div>
-                <div>` Categories</div>
-                <div>~ Topics</div>
-                <div>@ People</div>
-                <div># Cases</div>
-                <div>+ Tags</div>
-              </div>
-              
-              <button
-                onClick={() => setShowAdvancedForm(true)}
-                className="flex items-center space-x-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg transition-all text-gray-300"
-              >
-                <Edit3 className="h-4 w-4" />
-                <span>Advanced</span>
-              </button>
-              <button
-                onClick={createNote}
-                disabled={!newNote.trim()}
-                className="flex items-center space-x-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-all"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add Note</span>
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-white">Create Enhanced Note</h3>
-                <button
-                  onClick={() => setShowAdvancedForm(false)}
-                  className="text-gray-400 hover:text-white"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
-                  <input
-                    type="text"
-                    value={noteTitle}
-                    onChange={(e) => setNoteTitle(e.target.value)}
-                    placeholder="Note title..."
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-gray-600 text-white"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-gray-600 text-white"
-                  >
-                    <option value="">Select category...</option>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Content</label>
-                <textarea
-                  value={noteContent}
-                  onChange={(e) => setNoteContent(e.target.value)}
-                  placeholder="Note content..."
-                  rows={4}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-gray-600 text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Tags</label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {tags.map(tag => (
-                    <span
-                      key={tag}
-                      className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-500/20 text-purple-300"
-                    >
-                      {tag}
-                      <button
-                        onClick={() => removeFormTag(tag)}
-                        className="ml-1 text-purple-400 hover:text-purple-200"
-                      >
-                        ✕
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && addTag()}
-                    placeholder="Add tag..."
-                    className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-gray-600 text-white"
-                  />
-                  <button
-                    onClick={addTag}
-                    disabled={!tagInput.trim()}
-                    className="px-3 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-800 rounded-lg transition-all text-white"
-                  >
-                    Add
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => setShowAdvancedForm(false)}
-                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg transition-all text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={createNote}
-                  disabled={!noteTitle.trim() || !noteContent.trim()}
-                  className="px-4 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-all text-white"
-                >
-                  Create Note
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* View Toggle Buttons */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center mb-6">
           <div className="flex items-center space-x-2 bg-gray-900/50 border border-gray-800/50 rounded-xl p-1">
             <button
               onClick={() => setCurrentView('list')}
@@ -1049,18 +1651,6 @@ export default function KnowledgePage() {
             >
               <span>✨</span>
             </button>
-          </div>
-
-          {/* Search - moved to the right */}
-          <div className="relative flex-1 max-w-md ml-6">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search your notes..."
-              className="w-full pl-10 pr-4 py-3 bg-gray-900/50 border border-gray-800/50 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-gray-700 transition-all placeholder-gray-500"
-            />
           </div>
         </div>
 
@@ -1169,16 +1759,26 @@ export default function KnowledgePage() {
         )}
 
         {currentView === 'categories' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            {categories.map((category) => {
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {categories.filter(cat => ['Notes', 'References', 'Media', 'Documents'].includes(cat.name)).map((category) => {
               const categoryNotes = filteredNotes.filter(note => note.categoryId === category.id);
               return (
-                <div key={category.id} className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 transition-all">
+                <div 
+                  key={category.id} 
+                  className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 transition-all cursor-pointer group"
+                  onClick={() => {
+                    setSelectedCategoryForModal(category);
+                    setIsCategoryModalOpen(true);
+                  }}
+                >
                   <div className="flex items-center space-x-3 mb-3">
                     <span className="text-2xl">{category.icon}</span>
-                    <div>
-                      <h3 className="font-medium text-white">{category.name}</h3>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-white group-hover:text-purple-400 transition-colors">{category.name}</h3>
                       <p className="text-sm text-gray-400">{categoryNotes.length} notes</p>
+                    </div>
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-purple-400">→</span>
                     </div>
                   </div>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -1203,12 +1803,22 @@ export default function KnowledgePage() {
             {topics.map((topic) => {
               const topicNotes = filteredNotes.filter(note => note.linkedTopicIds.includes(topic.id));
               return (
-                <div key={topic.id} className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 transition-all">
+                <div 
+                  key={topic.id} 
+                  className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 transition-all cursor-pointer group"
+                  onClick={() => {
+                    setSelectedTopicForModal(topic);
+                    setIsTopicModalOpen(true);
+                  }}
+                >
                   <div className="flex items-center space-x-3 mb-3">
                     <span className="text-2xl">🏷️</span>
-                    <div>
-                      <h3 className="font-medium text-white">{topic.name}</h3>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-white group-hover:text-orange-400 transition-colors">{topic.name}</h3>
                       <p className="text-sm text-gray-400">{topicNotes.length} notes</p>
+                    </div>
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-orange-400">→</span>
                     </div>
                   </div>
                   {topic.description && (
@@ -1265,7 +1875,7 @@ export default function KnowledgePage() {
                     <div 
                       key={note.id} 
                       className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 transition-all group min-h-[200px] flex flex-col cursor-pointer"
-                      onClick={() => setExpandedNoteId(expandedNoteId === note.id ? null : note.id)}
+                      onClick={() => startEditing(note)}
                     >
                       {/* Header */}
                       <div className="mb-3">
@@ -1412,7 +2022,7 @@ export default function KnowledgePage() {
                   const linkedCases = cases.filter(caseItem => note.linkedCaseIds.includes(caseItem.id));
 
                   return (
-                    <div key={note.id} className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 transition-all group">
+                    <div key={note.id} className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 transition-all group cursor-pointer" onClick={() => startEditing(note)}>
                       {editingNoteId === note.id ? (
                         /* Editing Mode */
                         <div className="space-y-4">

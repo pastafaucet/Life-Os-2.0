@@ -336,16 +336,16 @@ export class LocalStorage {
         description: 'General notes and thoughts'
       },
       {
-        name: 'Articles',
-        color: '#10B981',
-        icon: '📰',
-        description: 'Saved articles and external content'
-      },
-      {
         name: 'References',
         color: '#F59E0B',
         icon: '🔗',
         description: 'Links and reference materials'
+      },
+      {
+        name: 'Media',
+        color: '#10B981',
+        icon: '📺',
+        description: 'Videos, images, and media content'
       },
       {
         name: 'Documents',
@@ -358,6 +358,72 @@ export class LocalStorage {
     defaultCategories.forEach(categoryData => {
       this.createCategory(categoryData);
     });
+  }
+
+  // Clean up categories to only have the 4 core ones
+  static resetToCoreCategoriesOnly() {
+    if (!this.isClient) return;
+
+    const coreCategories = ['Notes', 'References', 'Media', 'Documents'];
+    const currentCategories = this.getCategories();
+    const notes = this.getNotes();
+    
+    // Create mapping from old categories to new ones
+    const categoryMapping: {[key: string]: string} = {};
+    
+    // Clear all existing categories
+    this.saveCategories([]);
+    
+    // Create the 4 core categories
+    const newCategories: Category[] = [];
+    const coreData = [
+      { name: 'Notes', color: '#3B82F6', icon: '📋', description: 'General notes and thoughts' },
+      { name: 'References', color: '#F59E0B', icon: '🔗', description: 'Links and reference materials' },
+      { name: 'Media', color: '#10B981', icon: '📺', description: 'Videos, images, and media content' },
+      { name: 'Documents', color: '#6B7280', icon: '📄', description: 'Important documents and files' }
+    ];
+    
+    coreData.forEach(categoryData => {
+      const newCategory = this.createCategory(categoryData);
+      newCategories.push(newCategory);
+    });
+    
+    // Map old category IDs to new ones
+    const notesCategory = newCategories.find(c => c.name === 'Notes')!;
+    const referencesCategory = newCategories.find(c => c.name === 'References')!;
+    const mediaCategory = newCategories.find(c => c.name === 'Media')!;
+    const documentsCategory = newCategories.find(c => c.name === 'Documents')!;
+    
+    // Update all notes to use the new category IDs
+    const updatedNotes = notes.map(note => {
+      const oldCategory = currentCategories.find(c => c.id === note.categoryId);
+      let newCategoryId = notesCategory.id; // Default to Notes
+      
+      if (oldCategory) {
+        const categoryName = oldCategory.name.toLowerCase();
+        if (categoryName.includes('reference') || categoryName.includes('link')) {
+          newCategoryId = referencesCategory.id;
+        } else if (categoryName.includes('media') || categoryName.includes('video') || categoryName.includes('image')) {
+          newCategoryId = mediaCategory.id;
+        } else if (categoryName.includes('document') || categoryName.includes('file')) {
+          newCategoryId = documentsCategory.id;
+        }
+        // Everything else (including "Meeting Notes", "Ideas", etc.) goes to Notes
+      }
+      
+      return {
+        ...note,
+        categoryId: newCategoryId
+      };
+    });
+    
+    // Save the updated notes
+    this.saveNotes(updatedNotes);
+    
+    console.log('Categories reset to core 4 categories only');
+    console.log('Updated', updatedNotes.length, 'notes with new category mappings');
+    
+    return newCategories;
   }
 
   // Topics CRUD
