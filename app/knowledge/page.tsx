@@ -35,6 +35,9 @@ export default function KnowledgePage() {
   const [filterTags, setFilterTags] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  
+  // Status workflow state - now supports multiple selections
+  const [statusFilter, setStatusFilter] = useState<Set<'inbox' | 'active' | 'done' | 'archived'>>(new Set());
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNote, setEditingNote] = useState({ title: '', content: '' });
   
@@ -92,6 +95,7 @@ export default function KnowledgePage() {
     content: string;
     categoryId: string;
     tags: string[];
+    status: 'inbox' | 'active' | 'done' | 'archived';
   } | null>(null);
   const [modalStack, setModalStack] = useState<'category' | 'topic' | null>(null); // Track which modal opened the editor
 
@@ -107,6 +111,11 @@ export default function KnowledgePage() {
   const [topicModalView, setTopicModalView] = useState<'list' | 'grid'>('list');
   const [topicModalSort, setTopicModalSort] = useState<'date' | 'title' | 'tags'>('date');
 
+  // Inbox processing state
+  const [isInboxProcessingMode, setIsInboxProcessingMode] = useState(false);
+  const [processedNoteIds, setProcessedNoteIds] = useState<Set<string>>(new Set());
+  const [snoozedNotes, setSnoozedNotes] = useState<{[noteId: string]: Date}>({});
+
   useEffect(() => {
     LocalStorage.initialize();
     
@@ -116,6 +125,77 @@ export default function KnowledgePage() {
     loadData();
     setInitialized(true);
   }, []);
+
+  // Auto-trigger inbox processing mode when >10 notes
+  // Inbox processing helpers
+  const inboxNotes = notes.filter(note => note.status === 'inbox' && !snoozedNotes[note.id]);
+  const hasAgingNotes = inboxNotes.some(note => {
+    const noteDate = new Date(note.createdAt);
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    return noteDate < threeDaysAgo;
+  });
+
+  const getAgeInDays = (dateString: string) => {
+    const noteDate = new Date(dateString);
+    const today = new Date();
+    const diffTime = today.getTime() - noteDate.getTime();
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const getAgeIcon = (days: number) => {
+    if (days >= 5) return '🔥';
+    if (days >= 3) return '⚠️';
+    return '📝';
+  };
+
+  const getAgeColor = (days: number) => {
+    if (days >= 5) return 'text-red-400';
+    if (days >= 3) return 'text-orange-400';
+    return 'text-gray-400';
+  };
+
+  const snoozeNote = (noteId: string, days: number) => {
+    const snoozeUntil = new Date();
+    snoozeUntil.setDate(snoozeUntil.getDate() + days);
+    setSnoozedNotes(prev => ({
+      ...prev,
+      [noteId]: snoozeUntil
+    }));
+  };
+
+  const moveNoteToStatus = (noteId: string, newStatus: 'active' | 'done' | 'archived') => {
+    LocalStorage.updateNote(noteId, { 
+      status: newStatus,
+      updatedAt: new Date().toISOString()
+    });
+    setProcessedNoteIds(prev => new Set([...prev, noteId]));
+    loadData();
+  };
+
+  const enterInboxProcessingMode = () => {
+    setIsInboxProcessingMode(true);
+    setProcessedNoteIds(new Set());
+    setStatusFilter(new Set(['inbox'])); // Set to show only inbox notes
+    setCurrentView('list'); // Ensure we're in list view for processing
+  };
+
+  const exitInboxProcessingMode = () => {
+    setIsInboxProcessingMode(false);
+    setProcessedNoteIds(new Set());
+  };
+
+  useEffect(() => {
+    if (notes.length > 0) { // Only run after notes are loaded
+      if (inboxNotes.length > 10 && !isInboxProcessingMode) {
+        // Show prompt for auto-trigger
+        const shouldEnter = window.confirm(`Ready to process your inbox? (${inboxNotes.length} notes waiting)`);
+        if (shouldEnter) {
+          enterInboxProcessingMode();
+        }
+      }
+    }
+  }, [notes.length, isInboxProcessingMode]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -411,7 +491,8 @@ export default function KnowledgePage() {
       title: note.title,
       content: note.content,
       categoryId: note.categoryId,
-      tags: note.tags
+      tags: note.tags,
+      status: note.status
     });
     setModalStack(fromModal || null);
     setIsModalEditorOpen(true);
@@ -468,7 +549,8 @@ export default function KnowledgePage() {
       title: '',
       content: '',
       categoryId: categories.find(cat => cat.name === 'Notes')?.id || categories[0]?.id || '',
-      tags: []
+      tags: [],
+      status: 'inbox' // Default to inbox for new notes
     });
     setIsModalEditorOpen(true);
   };
@@ -866,8 +948,13 @@ export default function KnowledgePage() {
       return false;
     }
     
-    // Status filter
+    // Status filter (legacy)
     if (filterStatus && note.status !== filterStatus) {
+      return false;
+    }
+    
+    // New status filter - handle multiple selections
+    if (statusFilter.size > 0 && !statusFilter.has(note.status)) {
       return false;
     }
     
@@ -940,6 +1027,73 @@ export default function KnowledgePage() {
     loadData();
     
     console.log(`Cycled note ${noteId} from ${currentCategory?.name || 'Unknown'} to ${nextCategory.name}`);
+  };
+
+  const cycleStatusForNote = (noteId: string) => {
+    const note = notes.find(n => n.id === noteId);
+    if (!note) return;
+
+    // Status progression: inbox → active → done → archived → inbox
+    const statusProgression: { [key: string]: 'inbox' | 'active' | 'done' | 'archived' } = {
+      'inbox': 'active',
+      'active': 'done', 
+      'done': 'archived',
+      'archived': 'inbox'
+    };
+
+    const nextStatus = statusProgression[note.status] || 'inbox';
+
+    // Update the note's status
+    LocalStorage.updateNote(noteId, { 
+      status: nextStatus,
+      updatedAt: new Date().toISOString()
+    });
+
+    // Reload data to reflect changes
+    loadData();
+    
+    console.log(`Cycled note ${noteId} from ${note.status} to ${nextStatus}`);
+  };
+
+  // Status styling helper
+  const getStatusStyle = (status: string) => {
+    switch (status) {
+      case 'inbox':
+        return {
+          bg: 'bg-gray-500/20',
+          text: 'text-gray-400',
+          border: 'border-gray-500/30',
+          icon: '📥'
+        };
+      case 'active':
+        return {
+          bg: 'bg-blue-500/20',
+          text: 'text-blue-400',
+          border: 'border-blue-500/30',
+          icon: '🔄'
+        };
+      case 'done':
+        return {
+          bg: 'bg-green-500/20',
+          text: 'text-green-400',
+          border: 'border-green-500/30',
+          icon: '✅'
+        };
+      case 'archived':
+        return {
+          bg: 'bg-purple-500/20',
+          text: 'text-purple-400',
+          border: 'border-purple-500/30',
+          icon: '📦'
+        };
+      default:
+        return {
+          bg: 'bg-gray-500/20',
+          text: 'text-gray-400',
+          border: 'border-gray-500/30',
+          icon: '📥'
+        };
+    }
   };
 
   if (!initialized) {
@@ -1831,8 +1985,25 @@ export default function KnowledgePage() {
             </h1>
           </div>
           
-          {/* Compact Stats */}
+          {/* Compact Stats with Inbox Alert */}
           <div className="flex items-center space-x-8">
+            <div className="text-center">
+              <button
+                onClick={enterInboxProcessingMode}
+                className={`text-2xl font-bold transition-all cursor-pointer hover:scale-105 ${
+                  hasAgingNotes 
+                    ? 'text-red-400 animate-pulse' 
+                    : inboxNotes.length > 0 
+                      ? 'text-yellow-400 hover:text-yellow-300' 
+                      : 'text-gray-400'
+                }`}
+              >
+                📥 {inboxNotes.length}
+              </button>
+              <div className="text-xs text-gray-400">
+                {hasAgingNotes ? 'Needs Review!' : 'Inbox'}
+              </div>
+            </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-white">{totalNotes}</div>
               <div className="text-xs text-gray-400">Total Notes</div>
@@ -1885,9 +2056,8 @@ export default function KnowledgePage() {
           </div>
         </div>
 
-
-        {/* View Toggle Buttons */}
-        <div className="flex items-center mb-6">
+        {/* View Toggle Buttons & Status Filter */}
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-2 bg-gray-900/50 border border-gray-800/50 rounded-xl p-1">
             <button
               onClick={() => setCurrentView('list')}
@@ -1947,10 +2117,251 @@ export default function KnowledgePage() {
               <span>✨</span>
             </button>
           </div>
+
+          {/* Status Filter - Multi-select */}
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-400">Filter by status:</span>
+            <div className="flex items-center space-x-1 bg-gray-900/50 border border-gray-800/50 rounded-xl p-1">
+              {/* All/Clear button */}
+              <button
+                onClick={() => setStatusFilter(new Set())}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all text-sm ${
+                  statusFilter.size === 0
+                    ? 'bg-purple-500 text-white' 
+                    : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                }`}
+              >
+                <span>📋</span>
+                <span>All</span>
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                  statusFilter.size === 0 ? 'bg-white/20' : 'bg-gray-700'
+                }`}>
+                  {notes.length}
+                </span>
+              </button>
+
+              {/* Individual status filters */}
+              {(['inbox', 'active', 'done', 'archived'] as const).map((status) => {
+                const isActive = statusFilter.has(status);
+                const statusStyle = getStatusStyle(status);
+                const count = notes.filter(note => note.status === status).length;
+                
+                return (
+                  <button
+                    key={status}
+                    onClick={() => {
+                      const newFilter = new Set(statusFilter);
+                      if (isActive) {
+                        newFilter.delete(status);
+                      } else {
+                        newFilter.add(status);
+                      }
+                      setStatusFilter(newFilter);
+                    }}
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all text-sm ${
+                      isActive 
+                        ? 'bg-purple-500 text-white' 
+                        : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                    }`}
+                  >
+                    <span>{statusStyle.icon}</span>
+                    <span>{status.charAt(0).toUpperCase() + status.slice(1)}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                      isActive ? 'bg-white/20' : 'bg-gray-700'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
+        {/* Inbox Processing Mode - Dedicated Screen */}
+        {isInboxProcessingMode && (
+          <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-6 mb-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <span className="text-3xl">📥</span>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Inbox Processing</h2>
+                  <p className="text-gray-400">Process {inboxNotes.length} notes waiting in your inbox</p>
+                </div>
+              </div>
+              <button
+                onClick={exitInboxProcessingMode}
+                className="flex items-center space-x-2 px-4 py-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-xl transition-all"
+              >
+                <X className="h-4 w-4" />
+                <span>Exit Processing</span>
+              </button>
+            </div>
+
+            {/* Processing Progress */}
+            <div className="mb-6 p-4 bg-gray-800/30 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-gray-400">Progress</span>
+                <span className="text-sm text-purple-400">
+                  {processedNoteIds.size} of {inboxNotes.length} processed
+                </span>
+              </div>
+              <div className="w-full bg-gray-700 rounded-full h-2">
+                <div 
+                  className="bg-purple-500 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${inboxNotes.length > 0 ? (processedNoteIds.size / inboxNotes.length) * 100 : 0}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Inbox Notes for Processing */}
+            <div className="space-y-4">
+              {inboxNotes.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <span className="text-4xl mb-4 block">🎉</span>
+                  <h3 className="text-lg font-medium mb-2">Inbox is empty!</h3>
+                  <p className="text-sm">All notes have been processed.</p>
+                </div>
+              ) : (
+                inboxNotes.map((note) => {
+                  const category = categories.find(cat => cat.id === note.categoryId);
+                  const linkedTopics = topics.filter(topic => note.linkedTopicIds.includes(topic.id));
+                  const linkedPeople = people.filter(person => note.linkedPersonIds.includes(person.id));
+                  const linkedCases = cases.filter(caseItem => note.linkedCaseIds.includes(caseItem.id));
+                  const isProcessed = processedNoteIds.has(note.id);
+                  const ageInDays = getAgeInDays(note.createdAt);
+
+                  return (
+                    <div 
+                      key={note.id} 
+                      className={`border rounded-xl p-4 transition-all ${
+                        isProcessed 
+                          ? 'bg-green-500/10 border-green-500/30 opacity-75' 
+                          : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center mb-2">
+                            <span className={`mr-2 ${getAgeColor(ageInDays)}`}>
+                              {getAgeIcon(ageInDays)}
+                            </span>
+                            <h3 className="text-lg font-medium text-white">{note.title}</h3>
+                            {ageInDays >= 3 && (
+                              <span className="ml-2 text-xs px-2 py-1 bg-orange-500/20 text-orange-400 rounded-full">
+                                {ageInDays} days old
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center space-x-2 flex-wrap gap-2 mb-3">
+                            {category && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                                {category.icon} {category.name}
+                              </span>
+                            )}
+
+                            {linkedTopics.map(topic => (
+                              <span key={topic.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                                ~ {topic.name}
+                              </span>
+                            ))}
+
+                            {linkedPeople.map(person => (
+                              <span key={person.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                @ {person.name}
+                              </span>
+                            ))}
+
+                            {linkedCases.map(caseItem => (
+                              <span key={caseItem.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-500/20 text-green-400 border border-green-500/30">
+                                # {caseItem.name}
+                              </span>
+                            ))}
+
+                            {note.tags.map((tag, tagIndex) => (
+                              <span key={`${tag}-${tagIndex}`} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                                + {tag}
+                              </span>
+                            ))}
+                          </div>
+
+                          <div className="text-xs text-gray-500">
+                            Created: {new Date(note.createdAt).toLocaleDateString()} • {new Date(note.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </div>
+                        </div>
+                        
+                        {!isProcessed && (
+                          <div className="flex items-center space-x-2 ml-4">
+                            <button 
+                              onClick={() => moveNoteToStatus(note.id, 'active')}
+                              className="flex items-center space-x-1 px-3 py-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all border border-blue-500/30"
+                            >
+                              <span>🔄</span>
+                              <span className="text-sm">Active</span>
+                            </button>
+                            <button 
+                              onClick={() => moveNoteToStatus(note.id, 'done')}
+                              className="flex items-center space-x-1 px-3 py-2 text-green-400 hover:text-green-300 hover:bg-green-500/10 rounded-lg transition-all border border-green-500/30"
+                            >
+                              <span>✅</span>
+                              <span className="text-sm">Done</span>
+                            </button>
+                            <button 
+                              onClick={() => moveNoteToStatus(note.id, 'archived')}
+                              className="flex items-center space-x-1 px-3 py-2 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 rounded-lg transition-all border border-purple-500/30"
+                            >
+                              <span>📦</span>
+                              <span className="text-sm">Archive</span>
+                            </button>
+                            <button 
+                              onClick={() => startEditing(note)}
+                              className="p-2 text-gray-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
+                              title="Edit Note"
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
+
+                        {isProcessed && (
+                          <div className="flex items-center space-x-2 ml-4">
+                            <span className="text-green-400 text-sm">✓ Processed</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Quick Actions */}
+            {inboxNotes.length > 0 && (
+              <div className="mt-6 flex items-center justify-center space-x-4">
+                <button
+                  onClick={() => {
+                    inboxNotes.forEach(note => moveNoteToStatus(note.id, 'active'));
+                  }}
+                  className="px-4 py-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all border border-blue-500/30"
+                >
+                  🔄 Move All to Active
+                </button>
+                <button
+                  onClick={() => {
+                    inboxNotes.forEach(note => moveNoteToStatus(note.id, 'archived'));
+                  }}
+                  className="px-4 py-2 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 rounded-lg transition-all border border-purple-500/30"
+                >
+                  📦 Archive All
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Conditional View Rendering */}
-        {currentView === 'ai-insights' && (
+        {!isInboxProcessingMode && currentView === 'ai-insights' && (
           <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
@@ -2433,7 +2844,46 @@ export default function KnowledgePage() {
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <div className="flex items-center mb-2">
-                                <h3 className="text-lg font-medium text-white mr-4">{note.title}</h3>
+                                <h3 className="text-lg font-medium text-white mr-2">{note.title}</h3>
+                                
+                                {/* Inbox Processing Action Buttons - Right after title */}
+                                {note.status === 'inbox' && (
+                                  <div className="flex items-center space-x-1 ml-2">
+                                    <button 
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        moveNoteToStatus(note.id, 'active');
+                                      }}
+                                      className="p-1 text-gray-500 hover:text-blue-400 hover:bg-blue-500/10 rounded transition-all text-sm"
+                                      title="Move to Active"
+                                    >
+                                      🔄
+                                    </button>
+                                    <button 
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        moveNoteToStatus(note.id, 'done');
+                                      }}
+                                      className="p-1 text-gray-500 hover:text-green-400 hover:bg-green-500/10 rounded transition-all text-sm"
+                                      title="Mark as Done"
+                                    >
+                                      ✅
+                                    </button>
+                                    <button 
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        moveNoteToStatus(note.id, 'archived');
+                                      }}
+                                      className="p-1 text-gray-500 hover:text-purple-400 hover:bg-purple-500/10 rounded transition-all text-sm"
+                                      title="Archive"
+                                    >
+                                      📦
+                                    </button>
+                                  </div>
+                                )}
                               </div>
 
                               <div className="flex justify-between items-start">
@@ -2484,7 +2934,7 @@ export default function KnowledgePage() {
                             </div>
                             
                             <div className="flex items-center space-x-2 ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button 
+                              <button
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
@@ -2510,14 +2960,24 @@ export default function KnowledgePage() {
                                 )}
                               </button>
                               <button 
-                                onClick={() => startEditing(note)}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  startEditing(note);
+                                }}
                                 className="p-2 text-gray-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all"
+                                title="Edit Note"
                               >
                                 <Edit3 className="h-4 w-4" />
                               </button>
                               <button 
-                                onClick={() => deleteNote(note.id)}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  deleteNote(note.id);
+                                }}
                                 className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                                title="Delete Note"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>

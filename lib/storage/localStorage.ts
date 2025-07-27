@@ -30,6 +30,37 @@ export class LocalStorage {
     if (categories.length === 0) {
       this.initializeDefaultCategories();
     }
+
+    // Migrate existing notes to ensure they have status field
+    this.migrateNotesToIncludeStatus();
+  }
+
+  // Migrate existing notes to ensure they have status field
+  static migrateNotesToIncludeStatus() {
+    if (!this.isClient) return;
+    
+    try {
+      const notes = JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTES) || '[]');
+      let needsMigration = false;
+      
+      const migratedNotes = notes.map((note: any) => {
+        if (!note.status) {
+          needsMigration = true;
+          return {
+            ...note,
+            status: 'inbox' // Default to inbox for existing notes
+          };
+        }
+        return note;
+      });
+      
+      if (needsMigration) {
+        localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(migratedNotes));
+        console.log('Migrated notes to include status field');
+      }
+    } catch (error) {
+      console.error('Error migrating notes:', error);
+    }
   }
 
   // Tasks
@@ -245,7 +276,7 @@ export class LocalStorage {
       linkedPersonIds: noteData.linkedPersonIds || [],
       linkedNoteIds: noteData.linkedNoteIds || [],
       tags: noteData.tags || [],
-      status: noteData.status || 'active',
+      status: noteData.status || 'inbox', // Default to inbox for new workflow
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       ...noteData

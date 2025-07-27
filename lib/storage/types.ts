@@ -57,7 +57,7 @@ export interface Note {
   linkedNoteIds: string[]; // Cross-note references
   
   tags: string[]; // Secondary organization
-  status: 'draft' | 'active' | 'archived';
+  status: 'inbox' | 'active' | 'done' | 'archived'; // Updated workflow: inbox → active → done → archived
   createdAt: string;
   updatedAt: string;
 }
