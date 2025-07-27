@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Navigation from '../components/Navigation';
 import { LocalStorage } from '../../lib/storage/localStorage';
 import { Note, Category, Topic } from '../../lib/storage/types';
-import { Brain, Plus, Search, Edit3, Trash2, Target, TrendingUp, Folder, Link, Save, X } from 'lucide-react';
+import { Brain, Plus, Search, Edit3, Trash2, Target, TrendingUp, Folder, Link, Save, X, Sparkles, Lightbulb, Zap } from 'lucide-react';
+import { analyzeNote, generateKnowledgeInsights } from '../../openai';
 
 export default function KnowledgePage() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -50,6 +51,35 @@ export default function KnowledgePage() {
   const [editingCaseValue, setEditingCaseValue] = useState('');
   const [editingTopic, setEditingTopic] = useState<{ noteId: string; topicId: string } | null>(null);
   const [editingTopicValue, setEditingTopicValue] = useState('');
+
+  // AI features state
+  const [aiInsights, setAiInsights] = useState<{
+    patterns: string[];
+    recommendations: string[];
+    crossReferences: Array<{ noteId1: string; noteId2: string; connection: string }>;
+  } | null>(null);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [noteAnalysis, setNoteAnalysis] = useState<{[noteId: string]: {
+    summary: string;
+    suggestedCategory: string;
+    keyTopics: string[];
+    relevanceScore: number;
+    insights: string[];
+  }}>({});
+  const [isAnalyzingNote, setIsAnalyzingNote] = useState<string | null>(null);
+  const [showingAIAnalysis, setShowingAIAnalysis] = useState<string | null>(null);
+
+  // View state
+  const [currentView, setCurrentView] = useState<'grid' | 'list' | 'categories' | 'topics' | 'ai-insights' | 'category-detail' | 'topic-detail'>('list');
+  
+  // Detail view state
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [detailViewMode, setDetailViewMode] = useState<'grid' | 'list'>('list');
+  const [detailSortBy, setDetailSortBy] = useState<'date' | 'title' | 'relevance'>('date');
+  
+  // Note expansion state
+  const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
 
   useEffect(() => {
     LocalStorage.initialize();
@@ -105,11 +135,11 @@ export default function KnowledgePage() {
     setNotes(LocalStorage.getNotes());
   };
 
-  const createNote = () => {
+  const createNote = async () => {
     if (showAdvancedForm) {
       if (!noteTitle.trim() || !noteContent.trim()) return;
       
-      LocalStorage.createNote({
+      const createdNote = LocalStorage.createNote({
         title: noteTitle,
         content: noteContent,
         categoryId: selectedCategory || (categories.find(cat => cat.name === 'General')?.id || 'general'),
@@ -118,6 +148,22 @@ export default function KnowledgePage() {
         linkedPersonIds: linkedPeople,
         tags: tags
       });
+
+      // Analyze the note with AI
+      if (noteContent.trim().length > 10) {
+        try {
+          setIsAnalyzingNote(createdNote.id);
+          const analysis = await analyzeNote(noteContent);
+          setNoteAnalysis(prev => ({
+            ...prev,
+            [createdNote.id]: analysis
+          }));
+        } catch (error) {
+          console.error('Failed to analyze note:', error);
+        } finally {
+          setIsAnalyzingNote(null);
+        }
+      }
       
       // Reset form
       setNoteTitle('');
@@ -232,7 +278,7 @@ export default function KnowledgePage() {
       
       console.log('Final clean title:', cleanTitle);
       
-      LocalStorage.createNote({
+      const createdNote = LocalStorage.createNote({
         title: cleanTitle.length > 50 ? cleanTitle.substring(0, 50) + '...' : cleanTitle,
         content: '', // Content should be empty after parsing symbols
         categoryId: detectedCategory,
@@ -241,6 +287,22 @@ export default function KnowledgePage() {
         linkedPersonIds: linkedPersonIds,
         tags: parsed.tags
       });
+
+      // Analyze the note with AI if it has meaningful content
+      if (cleanTitle.trim().length > 10) {
+        try {
+          setIsAnalyzingNote(createdNote.id);
+          const analysis = await analyzeNote(cleanTitle);
+          setNoteAnalysis(prev => ({
+            ...prev,
+            [createdNote.id]: analysis
+          }));
+        } catch (error) {
+          console.error('Failed to analyze note:', error);
+        } finally {
+          setIsAnalyzingNote(null);
+        }
+      }
       
       setNewNote('');
     }
@@ -471,6 +533,49 @@ export default function KnowledgePage() {
     }
   };
 
+  const generateAIInsights = async () => {
+    if (notes.length === 0) return;
+    
+    setIsGeneratingInsights(true);
+    try {
+      const insights = await generateKnowledgeInsights(notes);
+      setAiInsights(insights);
+    } catch (error) {
+      console.error('Failed to generate AI insights:', error);
+    } finally {
+      setIsGeneratingInsights(false);
+    }
+  };
+
+  const analyzeNoteManually = async (noteId: string, content: string) => {
+    // Clean content and ensure minimum length
+    const cleanContent = content.trim();
+    if (!cleanContent || cleanContent.length < 5) {
+      console.log('Content too short for analysis:', cleanContent);
+      return;
+    }
+    
+    console.log('Starting AI analysis for note:', noteId, 'Content:', cleanContent);
+    setIsAnalyzingNote(noteId);
+    
+    try {
+      const analysis = await analyzeNote(cleanContent);
+      console.log('AI analysis completed:', analysis);
+      setNoteAnalysis(prev => ({
+        ...prev,
+        [noteId]: analysis
+      }));
+      
+      // Show the analysis immediately after it's generated
+      setShowingAIAnalysis(noteId);
+    } catch (error) {
+      console.error('Failed to analyze note:', error);
+      alert('Failed to analyze note. Please check the console for details.');
+    } finally {
+      setIsAnalyzingNote(null);
+    }
+  };
+
   // Calculate knowledge stats
   const totalNotes = notes.length;
   const activeCategories = categories.filter(cat => cat.noteCount > 0).length;
@@ -572,7 +677,6 @@ export default function KnowledgePage() {
       return false;
     }
     
-    
     // Status filter
     if (filterStatus && note.status !== filterStatus) {
       return false;
@@ -663,42 +767,6 @@ export default function KnowledgePage() {
               </div>
             </div>
           ))}
-        </div>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-4 md:grid-cols-8 gap-3 mb-8">
-          <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 hover:bg-gray-800/50 transition-all cursor-pointer text-center group">
-            <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">📝</div>
-            <div className="text-xs text-gray-400 group-hover:text-gray-300">Quick Note</div>
-          </div>
-          <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 hover:bg-gray-800/50 transition-all cursor-pointer text-center group">
-            <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">📋</div>
-            <div className="text-xs text-gray-400 group-hover:text-gray-300">Meeting Notes</div>
-          </div>
-          <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 hover:bg-gray-800/50 transition-all cursor-pointer text-center group">
-            <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">⚖️</div>
-            <div className="text-xs text-gray-400 group-hover:text-gray-300">Case Note</div>
-          </div>
-          <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 hover:bg-gray-800/50 transition-all cursor-pointer text-center group">
-            <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">📰</div>
-            <div className="text-xs text-gray-400 group-hover:text-gray-300">Article Save</div>
-          </div>
-          <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 hover:bg-gray-800/50 transition-all cursor-pointer text-center group">
-            <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">🔗</div>
-            <div className="text-xs text-gray-400 group-hover:text-gray-300">Link to Case</div>
-          </div>
-          <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 hover:bg-gray-800/50 transition-all cursor-pointer text-center group">
-            <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">👤</div>
-            <div className="text-xs text-gray-400 group-hover:text-gray-300">Link to Person</div>
-          </div>
-          <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 hover:bg-gray-800/50 transition-all cursor-pointer text-center group">
-            <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">📁</div>
-            <div className="text-xs text-gray-400 group-hover:text-gray-300">Add Category</div>
-          </div>
-          <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 hover:bg-gray-800/50 transition-all cursor-pointer text-center group">
-            <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">🤖</div>
-            <div className="text-xs text-gray-400 group-hover:text-gray-300">AI Insight</div>
-          </div>
         </div>
 
         {/* Enhanced Note Creation */}
@@ -856,318 +924,605 @@ export default function KnowledgePage() {
           )}
         </div>
 
-        {/* Search */}
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search your notes..."
-            className="w-full pl-10 pr-4 py-3 bg-gray-900/50 border border-gray-800/50 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-gray-700 transition-all placeholder-gray-500"
-          />
+        {/* View Toggle Buttons */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-2 bg-gray-900/50 border border-gray-800/50 rounded-xl p-1">
+            <button
+              onClick={() => setCurrentView('list')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${
+                currentView === 'list' 
+                  ? 'bg-purple-500 text-white' 
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+              }`}
+            >
+              <span>📋</span>
+              <span>List View</span>
+            </button>
+            <button
+              onClick={() => setCurrentView('grid')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${
+                currentView === 'grid' 
+                  ? 'bg-purple-500 text-white' 
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+              }`}
+            >
+              <span>⊞</span>
+              <span>Grid View</span>
+            </button>
+            <button
+              onClick={() => setCurrentView('categories')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${
+                currentView === 'categories' 
+                  ? 'bg-purple-500 text-white' 
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+              }`}
+            >
+              <span>📁</span>
+              <span>Categories</span>
+            </button>
+            <button
+              onClick={() => setCurrentView('topics')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${
+                currentView === 'topics' 
+                  ? 'bg-purple-500 text-white' 
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+              }`}
+            >
+              <span>🏷️</span>
+              <span>Topics</span>
+            </button>
+            <button
+              onClick={() => {
+                setCurrentView('ai-insights');
+                if (!aiInsights) generateAIInsights();
+              }}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${
+                currentView === 'ai-insights' 
+                  ? 'bg-purple-500 text-white' 
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+              }`}
+            >
+              <span>✨</span>
+            </button>
+          </div>
+
+          {/* Search - moved to the right */}
+          <div className="relative flex-1 max-w-md ml-6">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search your notes..."
+              className="w-full pl-10 pr-4 py-3 bg-gray-900/50 border border-gray-800/50 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-gray-700 transition-all placeholder-gray-500"
+            />
+          </div>
         </div>
 
-        {/* Notes List */}
-        <div className="space-y-4">
-          {filteredNotes.length === 0 && searchQuery && (
-            <div className="text-center py-12 text-gray-500">
-              No notes found matching "{searchQuery}"
+        {/* Conditional View Rendering */}
+        {currentView === 'ai-insights' && (
+          <div className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-3">
+                <Sparkles className="h-6 w-6 text-purple-400" />
+                <h3 className="text-lg font-medium text-white">AI Knowledge Insights</h3>
+              </div>
+              <button
+                onClick={generateAIInsights}
+                disabled={isGeneratingInsights || notes.length === 0}
+                className="flex items-center space-x-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-all"
+              >
+                {isGeneratingInsights ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    <span>Analyzing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-4 w-4" />
+                    <span>Generate Insights</span>
+                  </>
+                )}
+              </button>
             </div>
-          )}
-          
-          {filteredNotes.length === 0 && !searchQuery && (
-            <div className="text-center py-12 text-gray-500">
-              No notes yet. Create your first note above.
-            </div>
-          )}
 
-          {filteredNotes.map((note) => {
-            const category = categories.find(cat => cat.id === note.categoryId);
-            const linkedTopics = topics.filter(topic => note.linkedTopicIds.includes(topic.id));
-            const linkedPeople = people.filter(person => note.linkedPersonIds.includes(person.id));
-            const linkedCases = cases.filter(caseItem => note.linkedCaseIds.includes(caseItem.id));
+            {aiInsights ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Patterns */}
+                <div className="bg-gray-800/50 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <TrendingUp className="h-5 w-5 text-blue-400" />
+                    <h4 className="font-medium text-blue-400">Patterns Detected</h4>
+                  </div>
+                  {aiInsights.patterns.length > 0 ? (
+                    <ul className="space-y-2">
+                      {aiInsights.patterns.map((pattern, index) => (
+                        <li key={index} className="text-sm text-gray-300 flex items-start space-x-2">
+                          <span className="text-blue-400 mt-1">•</span>
+                          <span>{pattern}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-gray-500">No patterns detected yet.</p>
+                  )}
+                </div>
 
-            return (
-              <div key={note.id} className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 transition-all group">
-                {editingNoteId === note.id ? (
-                  /* Editing Mode */
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
-                      <input
-                        type="text"
-                        value={editingNote.title}
-                        onChange={(e) => setEditingNote({ ...editingNote, title: e.target.value })}
-                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-gray-600 text-white"
-                        autoFocus
-                      />
+                {/* Recommendations */}
+                <div className="bg-gray-800/50 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <Lightbulb className="h-5 w-5 text-yellow-400" />
+                    <h4 className="font-medium text-yellow-400">Recommendations</h4>
+                  </div>
+                  {aiInsights.recommendations.length > 0 ? (
+                    <ul className="space-y-2">
+                      {aiInsights.recommendations.map((rec, index) => (
+                        <li key={index} className="text-sm text-gray-300 flex items-start space-x-2">
+                          <span className="text-yellow-400 mt-1">💡</span>
+                          <span>{rec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-gray-500">No recommendations available.</p>
+                  )}
+                </div>
+
+                {/* Cross References */}
+                <div className="bg-gray-800/50 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <Link className="h-5 w-5 text-green-400" />
+                    <h4 className="font-medium text-green-400">Connections</h4>
+                  </div>
+                  {aiInsights.crossReferences.length > 0 ? (
+                    <div className="space-y-2">
+                      {aiInsights.crossReferences.slice(0, 3).map((ref, index) => {
+                        const note1 = notes.find(n => n.id === ref.noteId1);
+                        const note2 = notes.find(n => n.id === ref.noteId2);
+                        return (
+                          <div key={index} className="text-sm">
+                            <div className="text-gray-300 mb-1">{ref.connection}</div>
+                            <div className="text-xs text-gray-500">
+                              {note1?.title.substring(0, 30)}... ↔ {note2?.title.substring(0, 30)}...
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">No connections found.</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <Sparkles className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                <p>Generate AI insights to discover patterns, get recommendations, and find connections in your knowledge base.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {currentView === 'categories' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            {categories.map((category) => {
+              const categoryNotes = filteredNotes.filter(note => note.categoryId === category.id);
+              return (
+                <div key={category.id} className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 transition-all">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <span className="text-2xl">{category.icon}</span>
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Content</label>
-                      <textarea
-                        value={editingNote.content}
-                        onChange={(e) => setEditingNote({ ...editingNote, content: e.target.value })}
-                        rows={3}
-                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-gray-600 text-white"
-                      />
-                    </div>
-                    <div className="flex justify-end space-x-2">
-                      <button
-                        onClick={cancelEdit}
-                        className="flex items-center space-x-1 px-3 py-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-all"
-                      >
-                        <X className="h-4 w-4" />
-                        <span>Cancel</span>
-                      </button>
-                      <button
-                        onClick={saveEdit}
-                        className="flex items-center space-x-1 px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-all"
-                      >
-                        <Save className="h-4 w-4" />
-                        <span>Save</span>
-                      </button>
+                      <h3 className="font-medium text-white">{category.name}</h3>
+                      <p className="text-sm text-gray-400">{categoryNotes.length} notes</p>
                     </div>
                   </div>
-                ) : (
-                  /* Display Mode */
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      {/* Line 1: Title with hover category change buttons */}
-                      <div className="flex items-center mb-2">
-                        <h3 className="text-lg font-medium text-white mr-4">{note.title}</h3>
-                        
-                        {/* Category Change Buttons (on hover) */}
-                        <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {categories
-                            .filter(cat => cat.id !== note.categoryId)
-                            .slice(0, 4) // Show max 4 buttons
-                            .map(cat => (
-                            <button
-                              key={cat.id}
-                              onClick={() => {
-                                const updatedNote = { ...note, categoryId: cat.id, updatedAt: new Date().toISOString() };
-                                setNotes(notes.map(n => n.id === note.id ? updatedNote : n));
-                                LocalStorage.updateNote(note.id, { categoryId: cat.id });
-                              }}
-                              className="px-2 py-1 text-xs rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all"
-                            >
-                              📁 {cat.name}
-                            </button>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {categoryNotes.slice(0, 5).map((note) => (
+                      <div key={note.id} className="p-2 bg-gray-800/30 rounded-lg">
+                        <p className="text-sm text-gray-300 truncate">{note.title}</p>
+                        <p className="text-xs text-gray-500">{new Date(note.updatedAt).toLocaleDateString()}</p>
+                      </div>
+                    ))}
+                    {categoryNotes.length > 5 && (
+                      <p className="text-xs text-gray-500 text-center">+{categoryNotes.length - 5} more notes</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {currentView === 'topics' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            {topics.map((topic) => {
+              const topicNotes = filteredNotes.filter(note => note.linkedTopicIds.includes(topic.id));
+              return (
+                <div key={topic.id} className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 transition-all">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <span className="text-2xl">🏷️</span>
+                    <div>
+                      <h3 className="font-medium text-white">{topic.name}</h3>
+                      <p className="text-sm text-gray-400">{topicNotes.length} notes</p>
+                    </div>
+                  </div>
+                  {topic.description && (
+                    <p className="text-sm text-gray-500 mb-3">{topic.description}</p>
+                  )}
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {topicNotes.slice(0, 5).map((note) => (
+                      <div key={note.id} className="p-2 bg-gray-800/30 rounded-lg">
+                        <p className="text-sm text-gray-300 truncate">{note.title}</p>
+                        <p className="text-xs text-gray-500">{new Date(note.updatedAt).toLocaleDateString()}</p>
+                      </div>
+                    ))}
+                    {topicNotes.length > 5 && (
+                      <p className="text-xs text-gray-500 text-center">+{topicNotes.length - 5} more notes</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {topics.length === 0 && (
+              <div className="col-span-full text-center py-12 text-gray-500">
+                <span className="text-4xl mb-4 block">🏷️</span>
+                <h3 className="text-lg font-medium mb-2">No topics yet</h3>
+                <p className="text-sm">Topics will appear here when you create notes with ~topic syntax</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {(currentView === 'list' || currentView === 'grid') && (
+          <div>
+            {filteredNotes.length === 0 && searchQuery && (
+              <div className="text-center py-12 text-gray-500">
+                No notes found matching "{searchQuery}"
+              </div>
+            )}
+            
+            {filteredNotes.length === 0 && !searchQuery && (
+              <div className="text-center py-12 text-gray-500">
+                No notes yet. Create your first note above.
+              </div>
+            )}
+
+            {currentView === 'grid' ? (
+              /* Grid View - Compact Layout */
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filteredNotes.map((note) => {
+                  const category = categories.find(cat => cat.id === note.categoryId);
+                  const linkedTopics = topics.filter(topic => note.linkedTopicIds.includes(topic.id));
+                  const linkedPeople = people.filter(person => note.linkedPersonIds.includes(person.id));
+                  const linkedCases = cases.filter(caseItem => note.linkedCaseIds.includes(caseItem.id));
+
+                  return (
+                    <div 
+                      key={note.id} 
+                      className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 transition-all group min-h-[200px] flex flex-col cursor-pointer"
+                      onClick={() => setExpandedNoteId(expandedNoteId === note.id ? null : note.id)}
+                    >
+                      {/* Header */}
+                      <div className="mb-3">
+                        <h3 className="text-lg font-semibold text-white mb-2 line-clamp-2 leading-tight">{note.title}</h3>
+                        {category && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                            {category.icon} {category.name}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Content Section - Compact badges like list view */}
+                      <div className="flex-1">
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {linkedTopics.map(topic => (
+                            <span key={topic.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/20 text-orange-400">
+                              ~ {topic.name}
+                            </span>
+                          ))}
+
+                          {linkedPeople.map(person => (
+                            <span key={person.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-500/20 text-blue-400">
+                              @ {person.name}
+                            </span>
+                          ))}
+
+                          {linkedCases.map(caseItem => (
+                            <span key={caseItem.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-500/20 text-green-400">
+                              # {caseItem.name}
+                            </span>
+                          ))}
+
+                          {note.tags.map((tag, tagIndex) => (
+                            <span key={`${tag}-${tagIndex}`} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-yellow-500/20 text-yellow-400">
+                              + {tag}
+                            </span>
                           ))}
                         </div>
                       </div>
 
-                      {/* Line 2: Metadata badges */}
-                      <div className="flex items-center space-x-2 flex-wrap gap-2">
-                        {/* Category Badge */}
-                        {category && (
-                          <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                            ` {category.name}
-                          </span>
-                        )}
-
-                        {/* Topic Badges */}
-                        {linkedTopics.map(topic => (
-                          <span key={topic.id}>
-                            {editingTopic?.topicId === topic.id ? (
-                              /* Inline editing mode */
-                              <input
-                                type="text"
-                                value={editingTopicValue}
-                                onChange={(e) => setEditingTopicValue(e.target.value)}
-                                onKeyDown={handleTopicKeyDown}
-                                onBlur={(e) => {
-                                  setTimeout(() => saveEditingTopic(), 100);
-                                }}
-                                autoFocus
-                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/40 text-orange-100 border border-orange-400 focus:ring-2 focus:ring-orange-500/50 focus:border-orange-400 outline-none min-w-[60px] max-w-[120px]"
-                                style={{ width: `${Math.max(60, editingTopicValue.length * 8 + 20)}px` }}
-                              />
+                      {/* Footer */}
+                      <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-800/50">
+                        <span className="text-xs text-gray-500">
+                          {new Date(note.updatedAt).toLocaleDateString()}
+                        </span>
+                        <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (noteAnalysis[note.id]) {
+                                // If analysis exists, toggle showing/hiding
+                                setShowingAIAnalysis(showingAIAnalysis === note.id ? null : note.id);
+                              } else {
+                                // If no analysis exists, generate it
+                                const contentForAnalysis = note.content.trim() ? 
+                                  note.title + ' ' + note.content : 
+                                  note.title;
+                                analyzeNoteManually(note.id, contentForAnalysis);
+                              }
+                            }}
+                            className="p-2 text-gray-500 hover:text-purple-400 hover:bg-purple-500/10 rounded-lg transition-colors"
+                            title={noteAnalysis[note.id] ? "Toggle AI Analysis" : "Analyze with AI"}
+                            disabled={isAnalyzingNote === note.id}
+                          >
+                            {isAnalyzingNote === note.id ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-purple-400 border-t-transparent"></div>
                             ) : (
-                              /* Display mode */
-                              <span 
-                                onClick={(e) => {
-                                  console.log('Topic clicked:', topic.name, 'topicId:', topic.id);
-                                  e.stopPropagation();
-                                  e.preventDefault();
-                                  startEditingTopic(note.id, topic.id, topic.name);
-                                }}
-                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30 cursor-pointer hover:bg-orange-500/30 transition-all"
-                                title="Click to edit topic"
-                              >
-                                ~ {topic.name}
-                              </span>
+                              <Sparkles className="h-4 w-4" />
                             )}
-                          </span>
-                        ))}
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startEditing(note);
+                            }}
+                            className="p-2 text-gray-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
+                            title="Edit Note"
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteNote(note.id);
+                            }}
+                            className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                            title="Delete Note"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
 
-                        {/* People Badges */}
-                        {linkedPeople.map(person => (
-                          <span key={person.id}>
-                            {editingPerson?.personId === person.id ? (
-                              /* Inline editing mode */
-                              <input
-                                type="text"
-                                value={editingPersonValue}
-                                onChange={(e) => setEditingPersonValue(e.target.value)}
-                                onKeyDown={handlePersonKeyDown}
-                                onBlur={(e) => {
-                                  setTimeout(() => saveEditingPerson(), 100);
-                                }}
-                                autoFocus
-                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-500/40 text-blue-100 border border-blue-400 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 outline-none min-w-[60px] max-w-[120px]"
-                                style={{ width: `${Math.max(60, editingPersonValue.length * 8 + 20)}px` }}
-                              />
-                            ) : (
-                              /* Display mode */
-                              <span 
-                                onClick={(e) => {
-                                  console.log('Person clicked:', person.name, 'personId:', person.id);
-                                  e.stopPropagation();
-                                  e.preventDefault();
-                                  startEditingPerson(note.id, person.id, person.name);
-                                }}
-                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 cursor-pointer hover:bg-blue-500/30 transition-all"
-                                title="Click to edit person"
-                              >
-                                @ {person.name}
-                              </span>
-                            )}
-                          </span>
-                        ))}
+                      {/* AI Analysis Display */}
+                      {noteAnalysis[note.id] && showingAIAnalysis === note.id && (
+                        <div className="mt-4 p-4 bg-gray-800/30 rounded-lg border border-gray-700/50">
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-medium text-purple-400 flex items-center gap-2">
+                              <Sparkles className="h-4 w-4" />
+                              AI Analysis
+                            </span>
+                            <button
+                              onClick={() => setShowingAIAnalysis(null)}
+                              className="text-gray-400 hover:text-white text-sm"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          
+                          {noteAnalysis[note.id].summary && (
+                            <p className="text-sm text-gray-300 mb-3 line-clamp-3">{noteAnalysis[note.id].summary}</p>
+                          )}
+                          
+                          {noteAnalysis[note.id].keyTopics.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {noteAnalysis[note.id].keyTopics.slice(0, 3).map((topic, index) => (
+                                <span key={index} className="text-xs px-2 py-1 bg-blue-500/20 text-blue-300 rounded-full">
+                                  {topic}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* List View - With AI Analysis Display Added */
+              <div className="space-y-4">
+                {filteredNotes.map((note) => {
+                  const category = categories.find(cat => cat.id === note.categoryId);
+                  const linkedTopics = topics.filter(topic => note.linkedTopicIds.includes(topic.id));
+                  const linkedPeople = people.filter(person => note.linkedPersonIds.includes(person.id));
+                  const linkedCases = cases.filter(caseItem => note.linkedCaseIds.includes(caseItem.id));
 
-                        {/* Case Badges */}
-                        {linkedCases.map(caseItem => (
-                          <span key={caseItem.id}>
-                            {editingCase?.caseId === caseItem.id ? (
-                              /* Inline editing mode */
-                              <input
-                                type="text"
-                                value={editingCaseValue}
-                                onChange={(e) => setEditingCaseValue(e.target.value)}
-                                onKeyDown={handleCaseKeyDown}
-                                onBlur={(e) => {
-                                  setTimeout(() => saveEditingCase(), 100);
-                                }}
-                                autoFocus
-                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-500/40 text-green-100 border border-green-400 focus:ring-2 focus:ring-green-500/50 focus:border-green-400 outline-none min-w-[60px] max-w-[120px]"
-                                style={{ width: `${Math.max(60, editingCaseValue.length * 8 + 20)}px` }}
-                              />
-                            ) : (
-                              /* Display mode */
-                              <span 
-                                onClick={(e) => {
-                                  console.log('Case clicked:', caseItem.name, 'caseId:', caseItem.id);
-                                  e.stopPropagation();
-                                  e.preventDefault();
-                                  startEditingCase(note.id, caseItem.id, caseItem.name);
-                                }}
-                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-500/20 text-green-400 border border-green-500/30 cursor-pointer hover:bg-green-500/30 transition-all"
-                                title="Click to edit case"
-                              >
-                                # {caseItem.name}
-                              </span>
-                            )}
-                          </span>
-                        ))}
+                  return (
+                    <div key={note.id} className="bg-gray-900/50 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 transition-all group">
+                      {editingNoteId === note.id ? (
+                        /* Editing Mode */
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
+                            <input
+                              type="text"
+                              value={editingNote.title}
+                              onChange={(e) => setEditingNote({ ...editingNote, title: e.target.value })}
+                              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-gray-600 text-white"
+                              autoFocus
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Content</label>
+                            <textarea
+                              value={editingNote.content}
+                              onChange={(e) => setEditingNote({ ...editingNote, content: e.target.value })}
+                              rows={3}
+                              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-gray-600 text-white"
+                            />
+                          </div>
+                          <div className="flex justify-end space-x-2">
+                            <button
+                              onClick={cancelEdit}
+                              className="flex items-center space-x-1 px-3 py-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-all"
+                            >
+                              <X className="h-4 w-4" />
+                              <span>Cancel</span>
+                            </button>
+                            <button
+                              onClick={saveEdit}
+                              className="flex items-center space-x-1 px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-all"
+                            >
+                              <Save className="h-4 w-4" />
+                              <span>Save</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Display Mode */
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center mb-2">
+                                <h3 className="text-lg font-medium text-white mr-4">{note.title}</h3>
+                              </div>
 
-                        {/* Tag Badges */}
-                        {note.tags.map((tag, tagIndex) => (
-                          <span key={`${tag}-${tagIndex}`}>
-                            {editingTag?.noteId === note.id && editingTag?.tagIndex === tagIndex ? (
-                              /* Inline editing mode */
-                              <input
-                                type="text"
-                                value={editingTagValue}
-                                onChange={(e) => setEditingTagValue(e.target.value)}
-                                onKeyDown={handleTagKeyDown}
-                                onBlur={(e) => {
-                                  // Only save if we're not clicking on another interactive element
-                                  setTimeout(() => saveEditingTag(), 100);
-                                }}
-                                autoFocus
-                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-yellow-500/40 text-yellow-100 border border-yellow-400 focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-400 outline-none min-w-[60px] max-w-[120px]"
-                                style={{ width: `${Math.max(60, editingTagValue.length * 8 + 20)}px` }}
-                              />
-                            ) : (
-                              /* Display mode */
-                              <span 
-                                onClick={(e) => {
-                                  console.log('Tag clicked:', tag, 'noteId:', note.id, 'tagIndex:', tagIndex);
-                                  e.stopPropagation();
-                                  e.preventDefault();
-                                  startEditingTag(note.id, tagIndex, tag);
-                                }}
-                                onContextMenu={(e) => {
-                                  e.preventDefault();
-                                  if (confirm(`Remove tag "${tag}"?`)) {
-                                    removeTag(note.id, tag);
+                              <div className="flex justify-between items-start">
+                                <div className="flex items-center space-x-2 flex-wrap gap-2">
+                                  {category && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                                      {category.icon} {category.name}
+                                    </span>
+                                  )}
+
+                                  {linkedTopics.map(topic => (
+                                    <span key={topic.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                                      ~ {topic.name}
+                                    </span>
+                                  ))}
+
+                                  {linkedPeople.map(person => (
+                                    <span key={person.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                      @ {person.name}
+                                    </span>
+                                  ))}
+
+                                  {linkedCases.map(caseItem => (
+                                    <span key={caseItem.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-500/20 text-green-400 border border-green-500/30">
+                                      # {caseItem.name}
+                                    </span>
+                                  ))}
+
+                                  {note.tags.map((tag, tagIndex) => (
+                                    <span key={`${tag}-${tagIndex}`} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                                      + {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                                
+                                <span className="text-xs text-gray-500 flex-shrink-0 ml-4">
+                                  {new Date(note.updatedAt).toLocaleDateString()} • {new Date(note.updatedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2 ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button 
+                                onClick={() => {
+                                  if (noteAnalysis[note.id]) {
+                                    // If analysis exists, toggle showing/hiding
+                                    setShowingAIAnalysis(showingAIAnalysis === note.id ? null : note.id);
+                                  } else {
+                                    // If no analysis exists, generate it
+                                    const contentForAnalysis = note.content.trim() ? 
+                                      note.title + ' ' + note.content : 
+                                      note.title;
+                                    analyzeNoteManually(note.id, contentForAnalysis);
                                   }
                                 }}
-                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 cursor-pointer hover:bg-yellow-500/30 transition-all"
-                                title="Click to edit, right-click to remove"
+                                className="p-2 text-gray-500 hover:text-purple-400 hover:bg-purple-500/10 rounded-lg transition-all"
+                                title={noteAnalysis[note.id] ? "Toggle AI Analysis" : "Analyze with AI"}
+                                disabled={isAnalyzingNote === note.id}
                               >
-                                + {tag}
-                              </span>
-                            )}
-                          </span>
-                        ))}
+                                {isAnalyzingNote === note.id ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-purple-400 border-t-transparent"></div>
+                                ) : (
+                                  <Sparkles className="h-4 w-4" />
+                                )}
+                              </button>
+                              <button 
+                                onClick={() => startEditing(note)}
+                                className="p-2 text-gray-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all"
+                              >
+                                <Edit3 className="h-4 w-4" />
+                              </button>
+                              <button 
+                                onClick={() => deleteNote(note.id)}
+                                className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
 
-                        {/* Add New Tag Button/Input */}
-                        {addingTagToNote === note.id ? (
-                          <input
-                            type="text"
-                            value={newTagValue}
-                            onChange={(e) => setNewTagValue(e.target.value)}
-                            onKeyDown={handleNewTagKeyDown}
-                            onBlur={(e) => {
-                              // Only save if we're not clicking on another interactive element
-                              setTimeout(() => saveNewTag(), 100);
-                            }}
-                            placeholder="tag name"
-                            autoFocus
-                            className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-700/50 text-gray-200 border border-gray-600 focus:ring-2 focus:ring-purple-500/50 focus:border-gray-500 outline-none min-w-[80px] max-w-[120px]"
-                            style={{ width: `${Math.max(80, newTagValue.length * 8 + 20)}px` }}
-                          />
-                        ) : (
-                          <button
-                            onClick={() => startAddingTag(note.id)}
-                            className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-700/30 text-gray-500 border border-gray-600/50 hover:bg-gray-600/30 hover:text-gray-400 hover:border-gray-500/50 transition-all cursor-pointer"
-                            title="Add new tag"
-                          >
-                            + add tag
-                          </button>
-                        )}
+                          {/* AI Analysis Display - NOW ADDED TO LIST VIEW */}
+                          {noteAnalysis[note.id] && showingAIAnalysis === note.id && (
+                            <div className="mt-4 p-4 bg-gray-800/30 rounded-lg border border-gray-700/50">
+                              <div className="flex items-center justify-between mb-3">
+                                <span className="text-sm font-medium text-purple-400 flex items-center gap-2">
+                                  <Sparkles className="h-4 w-4" />
+                                  AI Analysis
+                                </span>
+                                <button
+                                  onClick={() => setShowingAIAnalysis(null)}
+                                  className="text-gray-400 hover:text-white text-sm"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                              
+                              {noteAnalysis[note.id].summary && (
+                                <p className="text-sm text-gray-300 mb-3">{noteAnalysis[note.id].summary}</p>
+                              )}
+                              
+                              {noteAnalysis[note.id].keyTopics.length > 0 && (
+                                <div className="mb-3">
+                                  <p className="text-xs text-gray-500 mb-2">Key Topics:</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {noteAnalysis[note.id].keyTopics.map((topic, index) => (
+                                      <span key={index} className="text-xs px-2 py-1 bg-blue-500/20 text-blue-300 rounded-full">
+                                        {topic}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
 
-                        {/* Date */}
-                        <span className="text-xs text-gray-500 ml-auto">
-                          {new Date(note.updatedAt).toLocaleDateString()} • {new Date(note.updatedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                        </span>
-                      </div>
+                              {noteAnalysis[note.id].insights.length > 0 && (
+                                <div>
+                                  <p className="text-xs text-gray-500 mb-2">Insights:</p>
+                                  <ul className="space-y-1">
+                                    {noteAnalysis[note.id].insights.map((insight, index) => (
+                                      <li key={index} className="text-xs text-gray-400 flex items-start gap-2">
+                                        <span className="text-purple-400 mt-1">•</span>
+                                        <span>{insight}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    
-                    {/* Actions */}
-                    <div className="flex items-center space-x-2 ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={() => startEditing(note)}
-                        className="p-2 text-gray-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all"
-                      >
-                        <Edit3 className="h-4 w-4" />
-                      </button>
-                      <button 
-                        onClick={() => deleteNote(note.id)}
-                        className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

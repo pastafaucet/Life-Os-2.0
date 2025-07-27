@@ -330,16 +330,10 @@ export class LocalStorage {
   static initializeDefaultCategories() {
     const defaultCategories: Partial<Category>[] = [
       {
-        name: 'Meeting Notes',
+        name: 'Notes',
         color: '#3B82F6',
         icon: '📋',
-        description: 'Notes from meetings and calls'
-      },
-      {
-        name: 'Case Notes',
-        color: '#8B5CF6',
-        icon: '⚖️',
-        description: 'Research and notes related to specific cases'
+        description: 'General notes and thoughts'
       },
       {
         name: 'Articles',
@@ -352,12 +346,6 @@ export class LocalStorage {
         color: '#F59E0B',
         icon: '🔗',
         description: 'Links and reference materials'
-      },
-      {
-        name: 'Ideas',
-        color: '#EF4444',
-        icon: '💡',
-        description: 'Personal ideas and insights'
       },
       {
         name: 'Documents',

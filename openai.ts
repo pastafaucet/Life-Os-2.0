@@ -5,6 +5,144 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: true // For local development
 });
 
+export async function analyzeNote(noteText: string): Promise<{
+  summary: string;
+  suggestedCategory: string;
+  keyTopics: string[];
+  relevanceScore: number;
+  insights: string[];
+}> {
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [{
+        role: "system", 
+        content: `You are an expert knowledge management AI assistant for a lawyer. Analyze notes and provide structured insights.
+        
+        Available categories: General, Meeting Notes, Case Notes, Articles, Ideas, Research, Templates, Reference
+        
+        Return your analysis as a JSON object with this exact structure:
+        {
+          "summary": "2-3 sentence summary of the note",
+          "suggestedCategory": "one of the available categories",
+          "keyTopics": ["topic1", "topic2", "topic3"],
+          "relevanceScore": 85,
+          "insights": ["insight 1", "insight 2"]
+        }
+        
+        Guidelines:
+        - summary: Concise 2-3 sentence summary
+        - suggestedCategory: Choose the most appropriate category
+        - keyTopics: 2-5 key topics/themes (no more than 5)
+        - relevanceScore: 1-100 based on legal/professional importance
+        - insights: 1-3 actionable insights or connections`
+      }, {
+        role: "user",
+        content: `Analyze this note: "${noteText}"`
+      }],
+      temperature: 0.3,
+      max_tokens: 400
+    });
+    
+    const response = completion.choices[0].message.content?.trim();
+    if (response) {
+      try {
+        return JSON.parse(response);
+      } catch (parseError) {
+        console.warn('Failed to parse AI response:', parseError);
+      }
+    }
+    
+    // Fallback response
+    return {
+      summary: noteText.length > 100 ? noteText.substring(0, 100) + "..." : noteText,
+      suggestedCategory: "General",
+      keyTopics: [],
+      relevanceScore: 50,
+      insights: []
+    };
+    
+  } catch (error) {
+    console.warn('OpenAI API error:', error);
+    return {
+      summary: noteText.length > 100 ? noteText.substring(0, 100) + "..." : noteText,
+      suggestedCategory: "General", 
+      keyTopics: [],
+      relevanceScore: 50,
+      insights: []
+    };
+  }
+}
+
+export async function generateKnowledgeInsights(notes: any[]): Promise<{
+  patterns: string[];
+  recommendations: string[];
+  crossReferences: Array<{ noteId1: string; noteId2: string; connection: string }>;
+}> {
+  try {
+    // Get the most recent 20 notes for analysis
+    const recentNotes = notes.slice(0, 20).map(note => ({
+      id: note.id,
+      title: note.title,
+      content: note.content,
+      category: note.categoryId,
+      tags: note.tags,
+      linkedCases: note.linkedCaseIds,
+      linkedPeople: note.linkedPersonIds
+    }));
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [{
+        role: "system",
+        content: `You are an expert knowledge management AI that identifies patterns and generates insights from a lawyer's notes.
+        
+        Analyze the notes and return a JSON object with this structure:
+        {
+          "patterns": ["pattern 1", "pattern 2"],
+          "recommendations": ["recommendation 1", "recommendation 2"], 
+          "crossReferences": [{"noteId1": "id1", "noteId2": "id2", "connection": "how they relate"}]
+        }
+        
+        Focus on:
+        - Recurring themes or topics
+        - Knowledge gaps that need attention
+        - Optimization opportunities
+        - Cross-references between related notes
+        - Actionable recommendations for better knowledge management`
+      }, {
+        role: "user",
+        content: `Analyze these notes for patterns and insights: ${JSON.stringify(recentNotes)}`
+      }],
+      temperature: 0.4,
+      max_tokens: 500
+    });
+    
+    const response = completion.choices[0].message.content?.trim();
+    if (response) {
+      try {
+        return JSON.parse(response);
+      } catch (parseError) {
+        console.warn('Failed to parse AI insights response:', parseError);
+      }
+    }
+    
+    return {
+      patterns: [],
+      recommendations: [], 
+      crossReferences: []
+    };
+    
+  } catch (error) {
+    console.warn('OpenAI API error for insights:', error);
+    return {
+      patterns: [],
+      recommendations: [],
+      crossReferences: []
+    };
+  }
+}
+
 export async function estimateTaskTime(task: {
   title: string;
   type: string;
