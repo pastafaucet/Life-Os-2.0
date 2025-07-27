@@ -1391,112 +1391,389 @@ export default function KnowledgePage() {
               </button>
             </div>
 
-            {/* Modal Content */}
-            <div className="flex-1 p-6 space-y-4 overflow-y-auto">
-              {/* Title Field */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
-                <input
-                  type="text"
-                  value={modalEditingNote?.title || ''}
-                  onChange={(e) => modalEditingNote && setModalEditingNote({
-                    ...modalEditingNote,
-                    title: e.target.value
-                  })}
-                  placeholder="Note title..."
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white text-lg font-medium transition-all"
-                  autoFocus
-                />
-              </div>
-
-              {/* Category Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
-                <select
-                  value={modalEditingNote?.categoryId || ''}
-                  onChange={(e) => modalEditingNote && setModalEditingNote({
-                    ...modalEditingNote,
-                    categoryId: e.target.value
-                  })}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white transition-all"
-                >
-                  {categories.filter(cat => ['Notes', 'References', 'Media', 'Documents'].includes(cat.name)).map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Content Field - Auto-expanding */}
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-300 mb-2">Content</label>
-                <textarea
-                  value={modalEditingNote?.content || ''}
-                  onChange={(e) => {
-                    if (modalEditingNote) {
-                      setModalEditingNote({
-                        ...modalEditingNote,
-                        content: e.target.value
-                      });
-                    }
-                    // Auto-expand textarea
-                    const textarea = e.target as HTMLTextAreaElement;
-                    textarea.style.height = 'auto';
-                    textarea.style.height = Math.max(200, Math.min(600, textarea.scrollHeight)) + 'px';
-                  }}
-                  placeholder="Write your note content here... You can write as much as you need!"
-                  className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white leading-relaxed transition-all resize-none"
-                  style={{ minHeight: '200px' }}
-                  rows={8}
-                />
-                <div className="text-xs text-gray-500 mt-2">
-                  {modalEditingNote.content ? modalEditingNote.content.split(' ').length : 0} words • {modalEditingNote.content ? modalEditingNote.content.length : 0} characters
+            {/* Modal Content - Two Column Layout */}
+            <div className="flex-1 flex overflow-hidden">
+              {/* Left Column - Main Content */}
+              <div className="flex-1 flex flex-col p-6">
+                {/* Title Field */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
+                  <input
+                    type="text"
+                    value={modalEditingNote?.title || ''}
+                    onChange={(e) => modalEditingNote && setModalEditingNote({
+                      ...modalEditingNote,
+                      title: e.target.value
+                    })}
+                    placeholder="Note title..."
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white text-lg font-medium transition-all"
+                    autoFocus
+                  />
                 </div>
-              </div>
 
-              {/* Tags Field */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Tags</label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {modalEditingNote.tags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                    >
-                      {tag}
-                      <button
-                        onClick={() => {
-                          const updatedTags = modalEditingNote.tags.filter((_, i) => i !== index);
-                          setModalEditingNote({
-                            ...modalEditingNote,
-                            tags: updatedTags
-                          });
-                        }}
-                        className="ml-2 text-purple-400 hover:text-purple-200 text-lg leading-none"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
+                {/* Category Selection */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
+                  <select
+                    value={modalEditingNote?.categoryId || ''}
+                    onChange={(e) => modalEditingNote && setModalEditingNote({
+                      ...modalEditingNote,
+                      categoryId: e.target.value
+                    })}
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white transition-all"
+                  >
+                    {categories.filter(cat => ['Notes', 'References', 'Media', 'Documents'].includes(cat.name)).map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
+                    ))}
+                  </select>
                 </div>
-                <input
-                  type="text"
-                  placeholder="Add tags (press Enter to add)..."
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white transition-all"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      const input = e.target as HTMLInputElement;
-                      const newTag = input.value.trim();
-                      if (newTag && !modalEditingNote.tags.includes(newTag)) {
+
+                {/* Content Field - Takes up remaining space */}
+                <div className="flex-1 flex flex-col">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Content</label>
+                  <textarea
+                    value={modalEditingNote?.content || ''}
+                    onChange={(e) => {
+                      if (modalEditingNote) {
                         setModalEditingNote({
                           ...modalEditingNote,
-                          tags: [...modalEditingNote.tags, newTag]
+                          content: e.target.value
                         });
-                        input.value = '';
                       }
-                    }
-                  }}
-                />
+                    }}
+                    placeholder="Write your note content here... You can write as much as you need!"
+                    className="flex-1 w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white leading-relaxed transition-all resize-none"
+                    style={{ minHeight: '300px' }}
+                  />
+                  <div className="text-xs text-gray-500 mt-2">
+                    {modalEditingNote?.content ? modalEditingNote.content.split(' ').length : 0} words • {modalEditingNote?.content ? modalEditingNote.content.length : 0} characters
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column - Sidebar for Linked Items */}
+              <div className="w-80 border-l border-gray-700 p-6 bg-gray-800/20 overflow-y-auto">
+                <h3 className="text-sm font-medium text-gray-300 mb-4">Linked Items</h3>
+                
+                {/* All linked items display */}
+                <div className="mb-6">
+                  <div className="flex flex-wrap gap-2 mb-4 min-h-[2rem] p-3 bg-gray-800/40 rounded-lg border border-gray-700/50">
+                    {/* Tags */}
+                    {modalEditingNote?.tags.map((tag, index) => (
+                      <span
+                        key={`tag-${index}`}
+                        className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                      >
+                        + {tag}
+                        <button
+                          onClick={() => {
+                            if (modalEditingNote) {
+                              const updatedTags = modalEditingNote.tags.filter((_, i) => i !== index);
+                              setModalEditingNote({
+                                ...modalEditingNote,
+                                tags: updatedTags
+                              });
+                            }
+                          }}
+                          className="ml-1 text-purple-400 hover:text-purple-200 text-sm leading-none"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+
+                    {/* Linked People */}
+                    {modalEditingNote?.id && notes.find(n => n.id === modalEditingNote.id)?.linkedPersonIds.map(personId => {
+                      const person = people.find(p => p.id === personId);
+                      return person ? (
+                        <span
+                          key={`person-${personId}`}
+                          className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                        >
+                          @ {person.name}
+                          <button
+                            onClick={() => {
+                              if (modalEditingNote?.id) {
+                                const note = notes.find(n => n.id === modalEditingNote.id);
+                                if (note) {
+                                  const updatedPersonIds = note.linkedPersonIds.filter(id => id !== personId);
+                                  LocalStorage.updateNote(modalEditingNote.id, { linkedPersonIds: updatedPersonIds });
+                                  loadData();
+                                }
+                              }
+                            }}
+                            className="ml-1 text-blue-400 hover:text-blue-200 text-sm leading-none"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ) : null;
+                    })}
+
+                    {/* Linked Cases */}
+                    {modalEditingNote?.id && notes.find(n => n.id === modalEditingNote.id)?.linkedCaseIds.map(caseId => {
+                      const caseItem = cases.find(c => c.id === caseId);
+                      return caseItem ? (
+                        <span
+                          key={`case-${caseId}`}
+                          className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-500/20 text-green-300 border border-green-500/30"
+                        >
+                          # {caseItem.name}
+                          <button
+                            onClick={() => {
+                              if (modalEditingNote?.id) {
+                                const note = notes.find(n => n.id === modalEditingNote.id);
+                                if (note) {
+                                  const updatedCaseIds = note.linkedCaseIds.filter(id => id !== caseId);
+                                  LocalStorage.updateNote(modalEditingNote.id, { linkedCaseIds: updatedCaseIds });
+                                  loadData();
+                                }
+                              }
+                            }}
+                            className="ml-1 text-green-400 hover:text-green-200 text-sm leading-none"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ) : null;
+                    })}
+
+                    {/* Linked Topics */}
+                    {modalEditingNote?.id && notes.find(n => n.id === modalEditingNote.id)?.linkedTopicIds.map(topicId => {
+                      const topic = topics.find(t => t.id === topicId);
+                      return topic ? (
+                        <span
+                          key={`topic-${topicId}`}
+                          className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/20 text-orange-300 border border-orange-500/30"
+                        >
+                          ~ {topic.name}
+                          <button
+                            onClick={() => {
+                              if (modalEditingNote?.id) {
+                                const note = notes.find(n => n.id === modalEditingNote.id);
+                                if (note) {
+                                  const updatedTopicIds = note.linkedTopicIds.filter(id => id !== topicId);
+                                  LocalStorage.updateNote(modalEditingNote.id, { linkedTopicIds: updatedTopicIds });
+                                  loadData();
+                                }
+                              }
+                            }}
+                            className="ml-1 text-orange-400 hover:text-orange-200 text-sm leading-none"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ) : null;
+                    })}
+                    
+                    {/* Empty state message */}
+                    {(() => {
+                      const hasAnyLinkedItems = (modalEditingNote?.tags.length || 0) > 0 || 
+                        (modalEditingNote?.id && (() => {
+                          const note = notes.find(n => n.id === modalEditingNote.id);
+                          return note && (
+                            note.linkedPersonIds.length > 0 || 
+                            note.linkedCaseIds.length > 0 || 
+                            note.linkedTopicIds.length > 0
+                          );
+                        })());
+                      return !hasAnyLinkedItems && (
+                        <span className="text-xs text-gray-500 italic">No linked items yet</span>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Add Tags */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-400 mb-2">Add Tags</label>
+                  <input
+                    type="text"
+                    placeholder="Type tag + Enter"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white text-sm transition-all"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const input = e.target as HTMLInputElement;
+                        const newTag = input.value.trim();
+                        if (newTag && modalEditingNote && !modalEditingNote.tags.includes(newTag)) {
+                          setModalEditingNote({
+                            ...modalEditingNote,
+                            tags: [...modalEditingNote.tags, newTag]
+                          });
+                          input.value = '';
+                        }
+                      }
+                    }}
+                  />
+                </div>
+
+                {/* Link Existing Items */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-400 mb-3">Link Existing</label>
+                  <div className="space-y-3">
+                    <select
+                      onChange={(e) => {
+                        if (e.target.value && modalEditingNote?.id) {
+                          const note = notes.find(n => n.id === modalEditingNote.id);
+                          if (note && !note.linkedPersonIds.includes(e.target.value)) {
+                            const updatedPersonIds = [...note.linkedPersonIds, e.target.value];
+                            LocalStorage.updateNote(modalEditingNote.id, { linkedPersonIds: updatedPersonIds });
+                            loadData();
+                          }
+                          e.target.value = '';
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white text-sm"
+                    >
+                      <option value="">+ Person...</option>
+                      {people.map(person => (
+                        <option key={person.id} value={person.id}>@ {person.name}</option>
+                      ))}
+                    </select>
+
+                    <select
+                      onChange={(e) => {
+                        if (e.target.value && modalEditingNote?.id) {
+                          const note = notes.find(n => n.id === modalEditingNote.id);
+                          if (note && !note.linkedCaseIds.includes(e.target.value)) {
+                            const updatedCaseIds = [...note.linkedCaseIds, e.target.value];
+                            LocalStorage.updateNote(modalEditingNote.id, { linkedCaseIds: updatedCaseIds });
+                            loadData();
+                          }
+                          e.target.value = '';
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white text-sm"
+                    >
+                      <option value="">+ Case...</option>
+                      {cases.map(caseItem => (
+                        <option key={caseItem.id} value={caseItem.id}># {caseItem.name}</option>
+                      ))}
+                    </select>
+
+                    <select
+                      onChange={(e) => {
+                        if (e.target.value && modalEditingNote?.id) {
+                          const note = notes.find(n => n.id === modalEditingNote.id);
+                          if (note && !note.linkedTopicIds.includes(e.target.value)) {
+                            const updatedTopicIds = [...note.linkedTopicIds, e.target.value];
+                            LocalStorage.updateNote(modalEditingNote.id, { linkedTopicIds: updatedTopicIds });
+                            loadData();
+                          }
+                          e.target.value = '';
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white text-sm"
+                    >
+                      <option value="">+ Topic...</option>
+                      {topics.map(topic => (
+                        <option key={topic.id} value={topic.id}>~ {topic.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Quick Create New Items */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-400 mb-3">Quick Create</label>
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      placeholder="New person + Enter"
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white text-sm"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const input = e.target as HTMLInputElement;
+                          const personName = input.value.trim();
+                          if (personName) {
+                            const newPerson = LocalStorage.createPerson({
+                              name: personName,
+                              email: '',
+                              phone: '',
+                              role: 'contact'
+                            });
+                            if (modalEditingNote?.id) {
+                              const note = notes.find(n => n.id === modalEditingNote.id);
+                              if (note) {
+                                const updatedPersonIds = [...note.linkedPersonIds, newPerson.id];
+                                LocalStorage.updateNote(modalEditingNote.id, { linkedPersonIds: updatedPersonIds });
+                                loadData();
+                              }
+                            }
+                            input.value = '';
+                          }
+                        }
+                      }}
+                    />
+
+                    <input
+                      type="text"
+                      placeholder="New case + Enter"
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white text-sm"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const input = e.target as HTMLInputElement;
+                          const caseName = input.value.trim();
+                          if (caseName) {
+                            const newCase = LocalStorage.createCase({
+                              name: caseName,
+                              status: 'Active'
+                            });
+                            if (modalEditingNote?.id) {
+                              const note = notes.find(n => n.id === modalEditingNote.id);
+                              if (note) {
+                                const updatedCaseIds = [...note.linkedCaseIds, newCase.id];
+                                LocalStorage.updateNote(modalEditingNote.id, { linkedCaseIds: updatedCaseIds });
+                                loadData();
+                              }
+                            }
+                            input.value = '';
+                          }
+                        }
+                      }}
+                    />
+
+                    <input
+                      type="text"
+                      placeholder="New topic + Enter"
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-white text-sm"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const input = e.target as HTMLInputElement;
+                          const topicName = input.value.trim();
+                          if (topicName && modalEditingNote) {
+                            const newTopic = LocalStorage.createTopic({
+                              name: topicName,
+                              description: `Created from note: ${modalEditingNote.title}`,
+                              color: 'orange'
+                            });
+                            if (modalEditingNote.id) {
+                              const note = notes.find(n => n.id === modalEditingNote.id);
+                              if (note) {
+                                const updatedTopicIds = [...note.linkedTopicIds, newTopic.id];
+                                LocalStorage.updateNote(modalEditingNote.id, { linkedTopicIds: updatedTopicIds });
+                                loadData();
+                              }
+                            }
+                            input.value = '';
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Help Text */}
+                <div className="text-xs text-gray-500 bg-gray-800/30 p-3 rounded-lg">
+                  <p className="mb-2">💡 <strong>Quick Tips:</strong></p>
+                  <p>• Type and press Enter to add items</p>
+                  <p>• Click × on any badge to remove</p>
+                  <p>• Tags are treated same as linked items</p>
+                </div>
               </div>
             </div>
 
