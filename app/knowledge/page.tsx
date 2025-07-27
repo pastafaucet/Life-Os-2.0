@@ -2077,17 +2077,45 @@ export default function KnowledgePage() {
                     </div>
                   </div>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {categoryNotes.slice(0, 5).map((note) => (
-                      <div key={note.id} className="p-2 bg-gray-800/30 rounded-lg">
-                        <p className="text-sm text-gray-300 truncate">{note.title}</p>
-                        <div className="flex items-center justify-between">
-                          <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                            {category.icon} {category.name}
-                          </span>
-                          <p className="text-xs text-gray-500">{new Date(note.updatedAt).toLocaleDateString()}</p>
+                    {categoryNotes.slice(0, 5).map((note) => {
+                      const linkedTopics = topics.filter(topic => note.linkedTopicIds.includes(topic.id));
+                      const linkedPeople = people.filter(person => note.linkedPersonIds.includes(person.id));
+                      const linkedCases = cases.filter(caseItem => note.linkedCaseIds.includes(caseItem.id));
+                      
+                      return (
+                        <div key={note.id} className="p-2 bg-gray-800/30 rounded-lg">
+                          <p className="text-sm text-gray-300 truncate">{note.title}</p>
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-wrap gap-1">
+                              {linkedTopics.map(topic => (
+                                <span key={topic.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                                  ~ {topic.name}
+                                </span>
+                              ))}
+
+                              {linkedPeople.map(person => (
+                                <span key={person.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                  @ {person.name}
+                                </span>
+                              ))}
+
+                              {linkedCases.map(caseItem => (
+                                <span key={caseItem.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-500/20 text-green-400 border border-green-500/30">
+                                  # {caseItem.name}
+                                </span>
+                              ))}
+
+                              {note.tags.map((tag, tagIndex) => (
+                                <span key={`${tag}-${tagIndex}`} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                                  + {tag}
+                                </span>
+                              ))}
+                            </div>
+                            <p className="text-xs text-gray-500 ml-2 flex-shrink-0">{new Date(note.updatedAt).toLocaleDateString()}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {categoryNotes.length > 5 && (
                       <p className="text-xs text-gray-500 text-center">+{categoryNotes.length - 5} more notes</p>
                     )}
@@ -2122,17 +2150,52 @@ export default function KnowledgePage() {
                     </div>
                   </div>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {topicNotes.slice(0, 5).map((note) => (
-                      <div key={note.id} className="p-2 bg-gray-800/30 rounded-lg">
-                        <p className="text-sm text-gray-300 truncate">{note.title}</p>
-                        <div className="flex items-center justify-between">
-                          <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                            ~ {topic.name}
-                          </span>
-                          <p className="text-xs text-gray-500">{new Date(note.updatedAt).toLocaleDateString()}</p>
+                    {topicNotes.slice(0, 5).map((note) => {
+                      const noteCategory = categories.find(cat => cat.id === note.categoryId);
+                      const linkedTopics = topics.filter(t => note.linkedTopicIds.includes(t.id));
+                      const linkedPeople = people.filter(person => note.linkedPersonIds.includes(person.id));
+                      const linkedCases = cases.filter(caseItem => note.linkedCaseIds.includes(caseItem.id));
+                      
+                      return (
+                        <div key={note.id} className="p-2 bg-gray-800/30 rounded-lg">
+                          <p className="text-sm text-gray-300 truncate">{note.title}</p>
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-wrap gap-1">
+                              {noteCategory && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                                  {noteCategory.icon} {noteCategory.name}
+                                </span>
+                              )}
+                              
+                              {linkedTopics.filter(t => selectedTopicForModal && t.id !== selectedTopicForModal.id).map(t => (
+                                <span key={t.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                                  ~ {t.name}
+                                </span>
+                              ))}
+
+                              {linkedPeople.map(person => (
+                                <span key={person.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                  @ {person.name}
+                                </span>
+                              ))}
+
+                              {linkedCases.map(caseItem => (
+                                <span key={caseItem.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-500/20 text-green-400 border border-green-500/30">
+                                  # {caseItem.name}
+                                </span>
+                              ))}
+
+                              {note.tags.map((tag, tagIndex) => (
+                                <span key={`${tag}-${tagIndex}`} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                                  + {tag}
+                                </span>
+                              ))}
+                            </div>
+                            <p className="text-xs text-gray-500 ml-2 flex-shrink-0">{new Date(note.updatedAt).toLocaleDateString()}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {topicNotes.length > 5 && (
                       <p className="text-xs text-gray-500 text-center">+{topicNotes.length - 5} more notes</p>
                     )}
