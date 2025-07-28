@@ -36,6 +36,22 @@ export default function KnowledgePage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   
+  // Enhanced search state
+  const [searchSuggestions, setSearchSuggestions] = useState<{
+    people: Array<{ id: string; name: string }>;
+    cases: Array<{ id: string; name: string }>;
+    topics: Array<{ id: string; name: string }>;
+    tags: string[];
+    categories: Array<{ id: string; name: string }>;
+  }>({ people: [], cases: [], topics: [], tags: [], categories: [] });
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [highlightedResults, setHighlightedResults] = useState<{[noteId: string]: {
+    titleHighlight?: string;
+    contentHighlight?: string;
+    matchedFields: string[];
+  }}>({});
+  
   // Status workflow state - now supports multiple selections
   const [statusFilter, setStatusFilter] = useState<Set<'inbox' | 'active' | 'done' | 'archived'>>(new Set());
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -124,6 +140,12 @@ export default function KnowledgePage() {
     
     loadData();
     setInitialized(true);
+    
+    // Load search history from localStorage
+    const savedHistory = localStorage.getItem('knowledgeHub_searchHistory');
+    if (savedHistory) {
+      setSearchHistory(JSON.parse(savedHistory));
+    }
   }, []);
 
   // Auto-trigger inbox processing mode when >10 notes
@@ -285,6 +307,60 @@ export default function KnowledgePage() {
     setTopics(LocalStorage.getTopics());
     setCases(LocalStorage.getCases());
     setPeople(LocalStorage.getPeople());
+    
+    // Update search suggestions when data changes
+    updateSearchSuggestions();
+  };
+
+  // Fuzzy matching utility function - MOVED TO TOP
+  const fuzzyMatch = (text: string, query: string): boolean => {
+    if (!text || !query) return false;
+    
+    const textLower = text.toLowerCase();
+    const queryLower = query.toLowerCase();
+    
+    // Exact match first
+    if (textLower.includes(queryLower)) return true;
+    
+    // Simple fuzzy matching - allow 1-2 character differences for words > 4 chars
+    if (queryLower.length <= 4) return false;
+    
+    // Remove vowels and compare
+    const removeVowels = (str: string) => str.replace(/[aeiou]/g, '');
+    const textNoVowels = removeVowels(textLower);
+    const queryNoVowels = removeVowels(queryLower);
+    
+    if (textNoVowels.includes(queryNoVowels)) return true;
+    
+    // Check for common character transpositions
+    for (let i = 0; i < queryLower.length - 1; i++) {
+      const transposed = queryLower.substring(0, i) + 
+                        queryLower[i + 1] + 
+                        queryLower[i] + 
+                        queryLower.substring(i + 2);
+      if (textLower.includes(transposed)) return true;
+    }
+    
+    return false;
+  };
+
+  const updateSearchSuggestions = () => {
+    const currentPeople = LocalStorage.getPeople();
+    const currentCases = LocalStorage.getCases();
+    const currentTopics = LocalStorage.getTopics();
+    const currentCategories = LocalStorage.getCategories();
+    const currentNotes = LocalStorage.getNotes();
+    
+    // Get all unique tags
+    const allTags = Array.from(new Set(currentNotes.flatMap(note => note.tags)));
+    
+    setSearchSuggestions({
+      people: currentPeople.map(p => ({ id: p.id, name: p.name })),
+      cases: currentCases.map(c => ({ id: c.id, name: c.name })),
+      topics: currentTopics.map(t => ({ id: t.id, name: t.name })),
+      tags: allTags,
+      categories: currentCategories.map(c => ({ id: c.id, name: c.name }))
+    });
   };
 
   const loadNotes = () => {
@@ -935,12 +1011,177 @@ export default function KnowledgePage() {
     }
   ];
 
-  // Advanced filtering logic
+  // Advanced filtering logic with Phase 2 features
   const filteredNotes = notes.filter(note => {
-    // Text search
-    if (searchQuery && !note.title.toLowerCase().includes(searchQuery.toLowerCase()) && 
-        !note.content.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
+    // Enhanced text search with advanced features
+    if (searchQuery) {
+      const query = searchQuery.trim();
+      
+      // Phase 2: Date Range Search
+      if (query.includes('created:') || query.includes('modified:')) {
+        const dateRangeMatch = query.match(/(created|modified):(\S+)/);
+        if (dateRangeMatch) {
+          const [, dateType, dateValue] = dateRangeMatch;
+          const noteDate = new Date(dateType === 'created' ? note.createdAt : note.updatedAt);
+          
+          if (dateValue.includes('..')) {
+            // Range format: 2025-01-01..2025-01-31
+            const [startDate, endDate] = dateValue.split('..');
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            if (noteDate < start || noteDate > end) return false;
+          } else if (dateValue === 'today') {
+            const today = new Date();
+            if (noteDate.toDateString() !== today.toDateString()) return false;
+          } else if (dateValue === 'yesterday') {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            if (noteDate.toDateString() !== yesterday.toDateString()) return false;
+          } else if (dateValue === 'last-week') {
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            if (noteDate < weekAgo) return false;
+          } else if (dateValue === 'last-month') {
+            const monthAgo = new Date();
+            monthAgo.setMonth(monthAgo.getMonth() - 1);
+            if (noteDate < monthAgo) return false;
+          } else {
+            // Single date
+            const targetDate = new Date(dateValue);
+            if (noteDate.toDateString() !== targetDate.toDateString()) return false;
+          }
+        }
+      }
+      
+      // Phase 2: Process search query for phrase search and exclusion
+      let excludeTerms: string[] = [];
+      let phraseSearches: string[] = [];
+      let regularSearchTerms: string[] = [];
+      
+      // First, extract phrase searches (quoted text) from original query
+      const phraseMatches = query.match(/\"([^\"]+)\"/g);
+      if (phraseMatches) {
+        phraseSearches = phraseMatches.map(match => match.slice(1, -1).toLowerCase());
+      }
+      
+      // Remove quotes from query for further processing
+      let queryWithoutQuotes = query.replace(/\"[^\"]+\"/g, '').trim();
+      
+      // Extract exclusion and regular terms from the query without quotes
+      const words = queryWithoutQuotes.split(/\s+/).filter(word => word.length > 0);
+      
+      words.forEach(word => {
+        if (word.startsWith('-') && word.length > 1) {
+          excludeTerms.push(word.substring(1).toLowerCase());
+        } else if (word && !word.startsWith('-')) {
+          regularSearchTerms.push(word.toLowerCase());
+        }
+      });
+      
+      // Combine all searchable text from note
+      const noteText = [
+        note.title,
+        note.content,
+        ...note.tags,
+        ...people.filter(person => note.linkedPersonIds.includes(person.id)).map(p => p.name),
+        ...cases.filter(caseItem => note.linkedCaseIds.includes(caseItem.id)).map(c => c.name),
+        ...topics.filter(topic => note.linkedTopicIds.includes(topic.id)).map(t => t.name),
+        ...(categories.find(cat => cat.id === note.categoryId) ? [categories.find(cat => cat.id === note.categoryId)!.name] : [])
+      ].join(' ').toLowerCase();
+      
+      // Phase 2: Check exclusion terms first (if any exclude term is found, filter out)
+      for (const excludeTerm of excludeTerms) {
+        if (noteText.includes(excludeTerm) || fuzzyMatch(noteText, excludeTerm)) {
+          return false;
+        }
+      }
+      
+      // Phase 2: Check phrase searches (all phrases must be found exactly)
+      for (const phrase of phraseSearches) {
+        if (!noteText.includes(phrase)) {
+          return false;
+        }
+      }
+      
+      // Handle symbol-based searches for regular terms
+      for (const term of regularSearchTerms) {
+        if (term.startsWith('@')) {
+          // Search for specific person
+          const personName = term.substring(1);
+          const linkedPeople = people.filter(person => note.linkedPersonIds.includes(person.id));
+          const hasMatchingPerson = linkedPeople.some(person => 
+            person.name.toLowerCase().includes(personName)
+          );
+          if (!hasMatchingPerson) return false;
+        } else if (term.startsWith('#')) {
+          // Search for specific case
+          const caseName = term.substring(1);
+          const linkedCases = cases.filter(caseItem => note.linkedCaseIds.includes(caseItem.id));
+          const hasMatchingCase = linkedCases.some(caseItem => 
+            caseItem.name.toLowerCase().includes(caseName)
+          );
+          if (!hasMatchingCase) return false;
+        } else if (term.startsWith('~')) {
+          // Search for specific topic
+          const topicName = term.substring(1);
+          const linkedTopics = topics.filter(topic => note.linkedTopicIds.includes(topic.id));
+          const hasMatchingTopic = linkedTopics.some(topic => 
+            topic.name.toLowerCase().includes(topicName)
+          );
+          if (!hasMatchingTopic) return false;
+        } else if (term.startsWith('+')) {
+          // Search for specific tag
+          const tagName = term.substring(1);
+          const hasMatchingTag = note.tags.some(tag => 
+            tag.toLowerCase().includes(tagName)
+          );
+          if (!hasMatchingTag) return false;
+        } else if (term.startsWith('category:')) {
+          // Search within specific category
+          const categoryName = term.substring(9);
+          const noteCategory = categories.find(cat => cat.id === note.categoryId);
+          if (!noteCategory || !noteCategory.name.toLowerCase().includes(categoryName)) {
+            return false;
+          }
+        } else {
+          // Regular text search with fuzzy matching
+          const titleMatch = note.title.toLowerCase().includes(term) || fuzzyMatch(note.title, term);
+          const contentMatch = note.content.toLowerCase().includes(term) || fuzzyMatch(note.content, term);
+          
+          // Search in tags with fuzzy matching
+          const tagMatch = note.tags.some(tag => 
+            tag.toLowerCase().includes(term) || fuzzyMatch(tag, term)
+          );
+          
+          // Search in linked people names with fuzzy matching
+          const linkedPeople = people.filter(person => note.linkedPersonIds.includes(person.id));
+          const personMatch = linkedPeople.some(person => 
+            person.name.toLowerCase().includes(term) || fuzzyMatch(person.name, term)
+          );
+          
+          // Search in linked case names with fuzzy matching
+          const linkedCases = cases.filter(caseItem => note.linkedCaseIds.includes(caseItem.id));
+          const caseMatch = linkedCases.some(caseItem => 
+            caseItem.name.toLowerCase().includes(term) || fuzzyMatch(caseItem.name, term)
+          );
+          
+          // Search in linked topic names with fuzzy matching
+          const linkedTopics = topics.filter(topic => note.linkedTopicIds.includes(topic.id));
+          const topicMatch = linkedTopics.some(topic => 
+            topic.name.toLowerCase().includes(term) || fuzzyMatch(topic.name, term)
+          );
+          
+          // Search in category name with fuzzy matching
+          const noteCategory = categories.find(cat => cat.id === note.categoryId);
+          const categoryMatch = noteCategory ? 
+            (noteCategory.name.toLowerCase().includes(term) || fuzzyMatch(noteCategory.name, term)) : false;
+          
+          // Return false if no field matches this term
+          if (!titleMatch && !contentMatch && !tagMatch && !personMatch && !caseMatch && !topicMatch && !categoryMatch) {
+            return false;
+          }
+        }
+      }
     }
     
     // Category filter
@@ -981,6 +1222,108 @@ export default function KnowledgePage() {
     
     return true;
   }).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+  // Text highlighting utility
+  const highlightText = (text: string, query: string): string => {
+    if (!query || !text) return text;
+    
+    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')})`, 'gi');
+    return text.replace(regex, '<mark class="highlight">$1</mark>');
+  };
+
+  // Save search to history
+  const saveSearchToHistory = (query: string) => {
+    if (!query.trim()) return;
+    
+    const updatedHistory = [query, ...searchHistory.filter(h => h !== query)].slice(0, 10);
+    setSearchHistory(updatedHistory);
+    localStorage.setItem('knowledgeHub_searchHistory', JSON.stringify(updatedHistory));
+  };
+
+  // Get search suggestions based on current input
+  const getSearchSuggestions = (query: string): Array<{ type: string; value: string; label: string }> => {
+    if (!query.trim()) return [];
+    
+    const suggestions: Array<{ type: string; value: string; label: string }> = [];
+    const queryLower = query.toLowerCase();
+    
+    // Check if query starts with symbol
+    if (query.startsWith('@')) {
+      const searchTerm = query.substring(1).toLowerCase();
+      searchSuggestions.people
+        .filter(p => p.name.toLowerCase().includes(searchTerm))
+        .slice(0, 5)
+        .forEach(person => {
+          suggestions.push({
+            type: 'person',
+            value: `@${person.name}`,
+            label: `@ ${person.name}`
+          });
+        });
+    } else if (query.startsWith('#')) {
+      const searchTerm = query.substring(1).toLowerCase();
+      searchSuggestions.cases
+        .filter(c => c.name.toLowerCase().includes(searchTerm))
+        .slice(0, 5)
+        .forEach(caseItem => {
+          suggestions.push({
+            type: 'case',
+            value: `#${caseItem.name}`,
+            label: `# ${caseItem.name}`
+          });
+        });
+    } else if (query.startsWith('~')) {
+      const searchTerm = query.substring(1).toLowerCase();
+      searchSuggestions.topics
+        .filter(t => t.name.toLowerCase().includes(searchTerm))
+        .slice(0, 5)
+        .forEach(topic => {
+          suggestions.push({
+            type: 'topic',
+            value: `~${topic.name}`,
+            label: `~ ${topic.name}`
+          });
+        });
+    } else if (query.startsWith('+')) {
+      const searchTerm = query.substring(1).toLowerCase();
+      searchSuggestions.tags
+        .filter(tag => tag.toLowerCase().includes(searchTerm))
+        .slice(0, 5)
+        .forEach(tag => {
+          suggestions.push({
+            type: 'tag',
+            value: `+${tag}`,
+            label: `+ ${tag}`
+          });
+        });
+    } else if (query.startsWith('category:')) {
+      const searchTerm = query.substring(9).toLowerCase();
+      searchSuggestions.categories
+        .filter(c => c.name.toLowerCase().includes(searchTerm))
+        .slice(0, 5)
+        .forEach(category => {
+          suggestions.push({
+            type: 'category',
+            value: `category:${category.name}`,
+            label: `📁 ${category.name}`
+          });
+        });
+    } else {
+      // Show recent searches
+      searchHistory
+        .filter(h => h.toLowerCase().includes(queryLower))
+        .slice(0, 3)
+        .forEach(history => {
+          suggestions.push({
+            type: 'history',
+            value: history,
+            label: `🕐 ${history}`
+          });
+        });
+    }
+    
+    return suggestions;
+  };
 
   // Get unique tags for suggestions
   const allTags = Array.from(new Set(notes.flatMap(note => note.tags)));
@@ -2049,10 +2392,123 @@ export default function KnowledgePage() {
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search your notes..."
+              onChange={(e) => {
+                const value = e.target.value;
+                setSearchQuery(value);
+                
+                // Show suggestions when typing
+                if (value.trim()) {
+                  setShowSuggestions(true);
+                } else {
+                  setShowSuggestions(false);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && searchQuery.trim()) {
+                  saveSearchToHistory(searchQuery);
+                  setShowSuggestions(false);
+                }
+              }}
+              onFocus={() => {
+                if (searchQuery.trim()) {
+                  setShowSuggestions(true);
+                }
+              }}
+              onBlur={() => {
+                // Delay hiding to allow clicking on suggestions  
+                setTimeout(() => setShowSuggestions(false), 150);
+              }}
+              placeholder="Search: @person #case &quot;exact phrase&quot; -exclude created:today modified:last-week"
               className="w-full pl-10 pr-4 py-3 bg-gray-900/50 border border-gray-800/50 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-gray-700 transition-all placeholder-gray-500 text-white"
             />
+            
+            {/* Enhanced Interactive Search Dropdown */}
+            {showSuggestions && searchQuery.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-[9999] max-h-80 overflow-y-auto">
+                {(() => {
+                  const suggestions = getSearchSuggestions(searchQuery);
+                  
+                  if (suggestions.length > 0) {
+                    return (
+                      <div className="py-2">
+                        {suggestions.map((suggestion, index) => (
+                          <button
+                            key={`${suggestion.type}-${index}`}
+                            onClick={() => {
+                              setSearchQuery(suggestion.value);
+                              setShowSuggestions(false);
+                              saveSearchToHistory(suggestion.value);
+                            }}
+                            className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center space-x-3 ${
+                              suggestion.type === 'person' ? 'text-blue-400' :
+                              suggestion.type === 'case' ? 'text-green-400' :
+                              suggestion.type === 'topic' ? 'text-orange-400' :
+                              suggestion.type === 'tag' ? 'text-yellow-400' :
+                              suggestion.type === 'category' ? 'text-purple-400' :
+                              'text-gray-300'
+                            }`}
+                          >
+                            <span className="text-sm">{suggestion.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="p-3">
+                        <div className="text-sm text-gray-300 flex items-center space-x-4">
+                          <span 
+                            onClick={() => {
+                              setSearchQuery('@');
+                              setShowSuggestions(false);
+                            }}
+                            className="text-blue-400 cursor-pointer hover:text-blue-300 transition-colors"
+                          >
+                            @ Person
+                          </span>
+                          <span 
+                            onClick={() => {
+                              setSearchQuery('#');
+                              setShowSuggestions(false);
+                            }}
+                            className="text-green-400 cursor-pointer hover:text-green-300 transition-colors"
+                          >
+                            # Case
+                          </span>
+                          <span 
+                            onClick={() => {
+                              setSearchQuery('~');
+                              setShowSuggestions(false);
+                            }}
+                            className="text-orange-400 cursor-pointer hover:text-orange-300 transition-colors"
+                          >
+                            ~ Topics
+                          </span>
+                          <span 
+                            onClick={() => {
+                              setSearchQuery('+');
+                              setShowSuggestions(false);
+                            }}
+                            className="text-yellow-400 cursor-pointer hover:text-yellow-300 transition-colors"
+                          >
+                            + Tags
+                          </span>
+                          <span 
+                            onClick={() => {
+                              setSearchQuery('category:');
+                              setShowSuggestions(false);
+                            }}
+                            className="text-purple-400 cursor-pointer hover:text-purple-300 transition-colors"
+                          >
+                            category:
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+                })()}
+              </div>
+            )}
           </div>
         </div>
 
@@ -3035,10 +3491,11 @@ export default function KnowledgePage() {
                                       <span 
                                         key={person.id} 
                                         onClick={(e) => {
+                                          e.preventDefault();
                                           e.stopPropagation();
                                           startEditingPerson(note.id, person.id, person.name);
                                         }}
-                                        className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 cursor-pointer hover:bg-blue-500/30 transition-all"
+                                        className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 cursor-pointer hover:bg-blue-500/30 hover:shadow-sm transition-all select-none"
                                         title="Click to edit person"
                                       >
                                         @ {person.name}
@@ -3046,33 +3503,35 @@ export default function KnowledgePage() {
                                     )
                                   ))}
 
-                                  {linkedCases.map(caseItem => (
-                                    editingCase?.noteId === note.id && editingCase?.caseId === caseItem.id ? (
-                                      <input
-                                        key={caseItem.id}
-                                        type="text"
-                                        value={editingCaseValue}
-                                        onChange={(e) => setEditingCaseValue(e.target.value)}
-                                        onKeyDown={handleCaseKeyDown}
-                                        onBlur={saveEditingCase}
-                                        className="px-2 py-1 rounded-md text-xs bg-green-500/40 text-green-200 border border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-400"
-                                        style={{ width: `${Math.max(editingCaseValue.length * 8, 60)}px` }}
-                                        autoFocus
-                                      />
-                                    ) : (
-                                      <span 
-                                        key={caseItem.id} 
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          startEditingCase(note.id, caseItem.id, caseItem.name);
-                                        }}
-                                        className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-500/20 text-green-400 border border-green-500/30 cursor-pointer hover:bg-green-500/30 transition-all"
-                                        title="Click to edit case"
-                                      >
-                                        # {caseItem.name}
-                                      </span>
-                                    )
-                                  ))}
+                          {linkedCases.map(caseItem => (
+                            editingCase?.noteId === note.id && editingCase?.caseId === caseItem.id ? (
+                              <input
+                                key={caseItem.id}
+                                type="text"
+                                value={editingCaseValue}
+                                onChange={(e) => setEditingCaseValue(e.target.value)}
+                                onKeyDown={handleCaseKeyDown}
+                                onBlur={saveEditingCase}
+                                className="px-2 py-1 rounded-md text-xs bg-green-500/40 text-green-200 border border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-400 min-w-[60px]"
+                                style={{ width: `${Math.max(editingCaseValue.length * 8, 60)}px` }}
+                                autoFocus
+                                onFocus={(e) => e.target.select()}
+                              />
+                            ) : (
+                              <span 
+                                key={caseItem.id} 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  startEditingCase(note.id, caseItem.id, caseItem.name);
+                                }}
+                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-500/20 text-green-400 border border-green-500/30 cursor-pointer hover:bg-green-500/30 hover:shadow-sm transition-all select-none"
+                                title="Click to edit case"
+                              >
+                                # {caseItem.name}
+                              </span>
+                            )
+                          ))}
 
                                   {note.tags.map((tag, tagIndex) => (
                                     editingTag?.noteId === note.id && editingTag?.tagIndex === tagIndex ? (
