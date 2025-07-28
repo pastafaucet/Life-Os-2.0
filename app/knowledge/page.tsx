@@ -2675,27 +2675,115 @@ export default function KnowledgePage() {
                       <div className="flex-1">
                         <div className="flex flex-wrap gap-1 mb-3">
                           {linkedTopics.map(topic => (
-                            <span key={topic.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/20 text-orange-400">
-                              ~ {topic.name}
-                            </span>
+                            editingTopic?.noteId === note.id && editingTopic?.topicId === topic.id ? (
+                              <input
+                                key={topic.id}
+                                type="text"
+                                value={editingTopicValue}
+                                onChange={(e) => setEditingTopicValue(e.target.value)}
+                                onKeyDown={handleTopicKeyDown}
+                                onBlur={saveEditingTopic}
+                                className="px-2 py-1 rounded-md text-xs bg-orange-500/40 text-orange-200 border border-orange-500/50 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                style={{ width: `${Math.max(editingTopicValue.length * 8, 60)}px` }}
+                                autoFocus
+                              />
+                            ) : (
+                              <span 
+                                key={topic.id} 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startEditingTopic(note.id, topic.id, topic.name);
+                                }}
+                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/20 text-orange-400 cursor-pointer hover:bg-orange-500/30 transition-all"
+                                title="Click to edit topic"
+                              >
+                                ~ {topic.name}
+                              </span>
+                            )
                           ))}
 
                           {linkedPeople.map(person => (
-                            <span key={person.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-500/20 text-blue-400">
-                              @ {person.name}
-                            </span>
+                            editingPerson?.noteId === note.id && editingPerson?.personId === person.id ? (
+                              <input
+                                key={person.id}
+                                type="text"
+                                value={editingPersonValue}
+                                onChange={(e) => setEditingPersonValue(e.target.value)}
+                                onKeyDown={handlePersonKeyDown}
+                                onBlur={saveEditingPerson}
+                                className="px-2 py-1 rounded-md text-xs bg-blue-500/40 text-blue-200 border border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                style={{ width: `${Math.max(editingPersonValue.length * 8, 60)}px` }}
+                                autoFocus
+                              />
+                            ) : (
+                              <span 
+                                key={person.id} 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startEditingPerson(note.id, person.id, person.name);
+                                }}
+                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-500/20 text-blue-400 cursor-pointer hover:bg-blue-500/30 transition-all"
+                                title="Click to edit person"
+                              >
+                                @ {person.name}
+                              </span>
+                            )
                           ))}
 
                           {linkedCases.map(caseItem => (
-                            <span key={caseItem.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-500/20 text-green-400">
-                              # {caseItem.name}
-                            </span>
+                            editingCase?.noteId === note.id && editingCase?.caseId === caseItem.id ? (
+                              <input
+                                key={caseItem.id}
+                                type="text"
+                                value={editingCaseValue}
+                                onChange={(e) => setEditingCaseValue(e.target.value)}
+                                onKeyDown={handleCaseKeyDown}
+                                onBlur={saveEditingCase}
+                                className="px-2 py-1 rounded-md text-xs bg-green-500/40 text-green-200 border border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-400"
+                                style={{ width: `${Math.max(editingCaseValue.length * 8, 60)}px` }}
+                                autoFocus
+                              />
+                            ) : (
+                              <span 
+                                key={caseItem.id} 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startEditingCase(note.id, caseItem.id, caseItem.name);
+                                }}
+                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-500/20 text-green-400 cursor-pointer hover:bg-green-500/30 transition-all"
+                                title="Click to edit case"
+                              >
+                                # {caseItem.name}
+                              </span>
+                            )
                           ))}
 
                           {note.tags.map((tag, tagIndex) => (
-                            <span key={`${tag}-${tagIndex}`} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-yellow-500/20 text-yellow-400">
-                              + {tag}
-                            </span>
+                            editingTag?.noteId === note.id && editingTag?.tagIndex === tagIndex ? (
+                              <input
+                                key={`${tag}-${tagIndex}`}
+                                type="text"
+                                value={editingTagValue}
+                                onChange={(e) => setEditingTagValue(e.target.value)}
+                                onKeyDown={handleTagKeyDown}
+                                onBlur={saveEditingTag}
+                                className="px-2 py-1 rounded-md text-xs bg-yellow-500/40 text-yellow-200 border border-yellow-500/50 focus:outline-none focus:ring-1 focus:ring-yellow-400"
+                                style={{ width: `${Math.max(editingTagValue.length * 8, 60)}px` }}
+                                autoFocus
+                              />
+                            ) : (
+                              <span 
+                                key={`${tag}-${tagIndex}`} 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startEditingTag(note.id, tagIndex, tag);
+                                }}
+                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-yellow-500/20 text-yellow-400 cursor-pointer hover:bg-yellow-500/30 transition-all"
+                                title="Click to edit tag"
+                              >
+                                + {tag}
+                              </span>
+                            )
                           ))}
                         </div>
                       </div>
@@ -2903,27 +2991,115 @@ export default function KnowledgePage() {
                                   )}
 
                                   {linkedTopics.map(topic => (
-                                    <span key={topic.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                                      ~ {topic.name}
-                                    </span>
+                                    editingTopic?.noteId === note.id && editingTopic?.topicId === topic.id ? (
+                                      <input
+                                        key={topic.id}
+                                        type="text"
+                                        value={editingTopicValue}
+                                        onChange={(e) => setEditingTopicValue(e.target.value)}
+                                        onKeyDown={handleTopicKeyDown}
+                                        onBlur={saveEditingTopic}
+                                        className="px-2 py-1 rounded-md text-xs bg-orange-500/40 text-orange-200 border border-orange-500/50 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                        style={{ width: `${Math.max(editingTopicValue.length * 8, 60)}px` }}
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <span 
+                                        key={topic.id} 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          startEditingTopic(note.id, topic.id, topic.name);
+                                        }}
+                                        className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30 cursor-pointer hover:bg-orange-500/30 transition-all"
+                                        title="Click to edit topic"
+                                      >
+                                        ~ {topic.name}
+                                      </span>
+                                    )
                                   ))}
 
                                   {linkedPeople.map(person => (
-                                    <span key={person.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                                      @ {person.name}
-                                    </span>
+                                    editingPerson?.noteId === note.id && editingPerson?.personId === person.id ? (
+                                      <input
+                                        key={person.id}
+                                        type="text"
+                                        value={editingPersonValue}
+                                        onChange={(e) => setEditingPersonValue(e.target.value)}
+                                        onKeyDown={handlePersonKeyDown}
+                                        onBlur={saveEditingPerson}
+                                        className="px-2 py-1 rounded-md text-xs bg-blue-500/40 text-blue-200 border border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                        style={{ width: `${Math.max(editingPersonValue.length * 8, 60)}px` }}
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <span 
+                                        key={person.id} 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          startEditingPerson(note.id, person.id, person.name);
+                                        }}
+                                        className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 cursor-pointer hover:bg-blue-500/30 transition-all"
+                                        title="Click to edit person"
+                                      >
+                                        @ {person.name}
+                                      </span>
+                                    )
                                   ))}
 
                                   {linkedCases.map(caseItem => (
-                                    <span key={caseItem.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-500/20 text-green-400 border border-green-500/30">
-                                      # {caseItem.name}
-                                    </span>
+                                    editingCase?.noteId === note.id && editingCase?.caseId === caseItem.id ? (
+                                      <input
+                                        key={caseItem.id}
+                                        type="text"
+                                        value={editingCaseValue}
+                                        onChange={(e) => setEditingCaseValue(e.target.value)}
+                                        onKeyDown={handleCaseKeyDown}
+                                        onBlur={saveEditingCase}
+                                        className="px-2 py-1 rounded-md text-xs bg-green-500/40 text-green-200 border border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-400"
+                                        style={{ width: `${Math.max(editingCaseValue.length * 8, 60)}px` }}
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <span 
+                                        key={caseItem.id} 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          startEditingCase(note.id, caseItem.id, caseItem.name);
+                                        }}
+                                        className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-green-500/20 text-green-400 border border-green-500/30 cursor-pointer hover:bg-green-500/30 transition-all"
+                                        title="Click to edit case"
+                                      >
+                                        # {caseItem.name}
+                                      </span>
+                                    )
                                   ))}
 
                                   {note.tags.map((tag, tagIndex) => (
-                                    <span key={`${tag}-${tagIndex}`} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
-                                      + {tag}
-                                    </span>
+                                    editingTag?.noteId === note.id && editingTag?.tagIndex === tagIndex ? (
+                                      <input
+                                        key={`${tag}-${tagIndex}`}
+                                        type="text"
+                                        value={editingTagValue}
+                                        onChange={(e) => setEditingTagValue(e.target.value)}
+                                        onKeyDown={handleTagKeyDown}
+                                        onBlur={saveEditingTag}
+                                        className="px-2 py-1 rounded-md text-xs bg-yellow-500/40 text-yellow-200 border border-yellow-500/50 focus:outline-none focus:ring-1 focus:ring-yellow-400"
+                                        style={{ width: `${Math.max(editingTagValue.length * 8, 60)}px` }}
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <span 
+                                        key={`${tag}-${tagIndex}`} 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          startEditingTag(note.id, tagIndex, tag);
+                                        }}
+                                        className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 cursor-pointer hover:bg-yellow-500/30 transition-all"
+                                        title="Click to edit tag"
+                                      >
+                                        + {tag}
+                                      </span>
+                                    )
                                   ))}
                                 </div>
                                 
