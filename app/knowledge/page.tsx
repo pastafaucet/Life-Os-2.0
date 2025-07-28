@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import Navigation from '../components/Navigation';
+import ErrorBoundary from '../components/ErrorBoundary';
 import { LocalStorage } from '../../lib/storage/localStorage';
 import { Note, Category, Topic, SelectionState, BulkUpdateData, AIAnalysis } from '../../lib/storage/types';
-import { Brain, Plus, Search, Edit3, Trash2, Target, TrendingUp, Folder, Link, Save, X, Sparkles, Lightbulb, Zap } from 'lucide-react';
+import { Brain, Plus, Search, Edit3, Trash2, Target, TrendingUp, Folder, Link, Save, X, Sparkles, Lightbulb, Zap, HelpCircle } from 'lucide-react';
 import { analyzeNote, generateKnowledgeInsights } from '../../openai';
 import BulkOperationsBar from '../components/bulk/BulkOperationsBar';
 import SelectableNoteCard from '../components/SelectableNoteCard';
+import HelpModal from '../components/HelpModal';
 
 export default function KnowledgePage() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -17,7 +19,9 @@ export default function KnowledgePage() {
   const [people, setPeople] = useState<any[]>([]);
   const [newNote, setNewNote] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [initialized, setInitialized] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Enhanced note creation state
   const [noteTitle, setNoteTitle] = useState('');
@@ -134,6 +138,9 @@ export default function KnowledgePage() {
   const [processedNoteIds, setProcessedNoteIds] = useState<Set<string>>(new Set());
   const [snoozedNotes, setSnoozedNotes] = useState<{[noteId: string]: Date}>({});
 
+  // Help modal state
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+
   useEffect(() => {
     LocalStorage.initialize();
     
@@ -221,6 +228,15 @@ export default function KnowledgePage() {
     }
   }, [notes.length, isInboxProcessingMode]);
 
+  // Search debouncing - wait 300ms after user stops typing
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(debounceTimer);
+  }, [searchQuery]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -291,6 +307,13 @@ export default function KnowledgePage() {
             console.log('Input not found'); // Debug log
           }
         }
+
+        // F1 or Ctrl+? to open help modal
+        if (event.key === 'F1' || ((event.ctrlKey || event.metaKey) && event.key === '?')) {
+          event.preventDefault();
+          event.stopPropagation();
+          setIsHelpModalOpen(true);
+        }
       }
     };
 
@@ -301,17 +324,23 @@ export default function KnowledgePage() {
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, [isModalEditorOpen, isCategoryModalOpen, isTopicModalOpen]);
+  }, [isModalEditorOpen, isCategoryModalOpen, isTopicModalOpen, isHelpModalOpen]);
 
   const loadData = () => {
-    setNotes(LocalStorage.getNotes());
-    setCategories(LocalStorage.getCategories());
-    setTopics(LocalStorage.getTopics());
-    setCases(LocalStorage.getCases());
-    setPeople(LocalStorage.getPeople());
+    setLoading(true);
     
-    // Update search suggestions when data changes
-    updateSearchSuggestions();
+    // Simulate brief loading for better UX
+    setTimeout(() => {
+      setNotes(LocalStorage.getNotes());
+      setCategories(LocalStorage.getCategories());
+      setTopics(LocalStorage.getTopics());
+      setCases(LocalStorage.getCases());
+      setPeople(LocalStorage.getPeople());
+      
+      // Update search suggestions when data changes
+      updateSearchSuggestions();
+      setLoading(false);
+    }, 100);
   };
 
   // Fuzzy matching utility function - MOVED TO TOP
@@ -1016,8 +1045,8 @@ export default function KnowledgePage() {
   // Advanced filtering logic with Phase 2 features
   const filteredNotes = notes.filter(note => {
     // Enhanced text search with advanced features
-    if (searchQuery) {
-      const query = searchQuery.trim();
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.trim();
       
       // Phase 2: Date Range Search
       if (query.includes('created:') || query.includes('modified:')) {
@@ -1452,6 +1481,17 @@ export default function KnowledgePage() {
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <Navigation />
+      
+      <ErrorBoundary>
+        {/* Loading Overlay */}
+        {loading && (
+          <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 flex items-center justify-center">
+            <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 flex items-center space-x-3">
+              <div className="animate-spin rounded-full h-6 w-6 border-2 border-purple-400 border-t-transparent"></div>
+              <span className="text-white font-medium">Loading...</span>
+            </div>
+          </div>
+        )}
       
       {/* Category Detail Modal */}
       {isCategoryModalOpen && selectedCategoryForModal && (
@@ -2328,6 +2368,13 @@ export default function KnowledgePage() {
             <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
               Knowledge Hub
             </h1>
+            <button
+              onClick={() => setIsHelpModalOpen(true)}
+              className="p-2 text-gray-400 hover:text-purple-400 hover:bg-purple-500/10 rounded-lg transition-all group"
+              title="Show keyboard shortcuts (F1)"
+            >
+              <HelpCircle className="h-5 w-5" />
+            </button>
           </div>
           
           {/* Compact Stats with Inbox Alert */}
@@ -3679,6 +3726,13 @@ export default function KnowledgePage() {
           </div>
         )}
       </div>
+      </ErrorBoundary>
+
+      {/* Help Modal */}
+      <HelpModal 
+        isOpen={isHelpModalOpen} 
+        onClose={() => setIsHelpModalOpen(false)} 
+      />
     </div>
   );
 }
