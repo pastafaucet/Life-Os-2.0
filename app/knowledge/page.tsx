@@ -10,6 +10,8 @@ import { analyzeNote, generateKnowledgeInsights } from '../../openai';
 import BulkOperationsBar from '../components/bulk/BulkOperationsBar';
 import SelectableNoteCard from '../components/SelectableNoteCard';
 import HelpModal from '../components/HelpModal';
+import EmptyState from '../components/EmptyState';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 export default function KnowledgePage() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -148,6 +150,24 @@ export default function KnowledgePage() {
 
   // Help modal state
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+
+  // Confirmation modal state
+  const [confirmationModal, setConfirmationModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    severity?: 'danger' | 'warning';
+    previewContent?: {
+      type: 'single' | 'multiple';
+      items: Array<{ title: string; subtitle?: string }>;
+    };
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
 
   useEffect(() => {
     LocalStorage.initialize();
@@ -595,8 +615,34 @@ export default function KnowledgePage() {
   };
 
   const deleteNote = (noteId: string) => {
-    LocalStorage.deleteNote(noteId);
-    loadData();
+    const noteToDelete = notes.find(n => n.id === noteId);
+    if (!noteToDelete) return;
+
+    setConfirmationModal({
+      isOpen: true,
+      title: "Delete Note",
+      message: "Are you sure you want to delete this note? This action cannot be undone.",
+      severity: 'danger',
+      previewContent: {
+        type: 'single',
+        items: [{
+          title: noteToDelete.title,
+          subtitle: noteToDelete.content ? `${noteToDelete.content.substring(0, 100)}...` : undefined
+        }]
+      },
+      onConfirm: () => {
+        LocalStorage.deleteNote(noteId);
+        loadData();
+      }
+    });
+  };
+  const closeConfirmationModal = () => {
+    setConfirmationModal({
+      isOpen: false,
+      title: '',
+      message: '',
+      onConfirm: () => {}
+    });
   };
 
   const startEditing = (note: Note, fromModal?: 'category' | 'topic') => {
@@ -1778,11 +1824,16 @@ export default function KnowledgePage() {
 
                 if (categoryNotes.length === 0) {
                   return (
-                    <div className="text-center py-12 text-gray-500">
-                      <span className="text-4xl mb-4 block">{selectedCategoryForModal.icon}</span>
-                      <h3 className="text-lg font-medium mb-2">No notes in this category yet</h3>
-                      <p className="text-sm">Create some notes to see them here</p>
-                    </div>
+                    <EmptyState
+                      icon={selectedCategoryForModal.icon}
+                      title="No notes in this category yet"
+                      description={`Start organizing your knowledge by creating notes in the ${selectedCategoryForModal.name} category.`}
+                      actionButton={{
+                        label: "Create Note",
+                        onClick: startCapture
+                      }}
+                      helpText="You can also drag and drop notes between categories or change a note's category by clicking the category badge."
+                    />
                   );
                 }
 
@@ -1980,11 +2031,16 @@ export default function KnowledgePage() {
 
                 if (topicNotes.length === 0) {
                   return (
-                    <div className="text-center py-12 text-gray-500">
-                      <span className="text-4xl mb-4 block">🏷️</span>
-                      <h3 className="text-lg font-medium mb-2">No notes with this topic yet</h3>
-                      <p className="text-sm">Create notes with ~{selectedTopicForModal.name} to see them here</p>
-                    </div>
+                    <EmptyState
+                      icon="🏷️"
+                      title="No notes with this topic yet"
+                      description={`Start building knowledge around ${selectedTopicForModal.name} by creating notes and linking them to this topic.`}
+                      actionButton={{
+                        label: "Create Note",
+                        onClick: startCapture
+                      }}
+                      helpText={`Tag new notes with ~${selectedTopicForModal.name} or use the modal editor to link existing notes to this topic.`}
+                    />
                   );
                 }
 
@@ -3305,15 +3361,30 @@ export default function KnowledgePage() {
         {(currentView === 'list' || currentView === 'grid') && (
           <div>
             {filteredNotes.length === 0 && searchQuery && (
-              <div className="text-center py-12 text-gray-500">
-                No notes found matching "{searchQuery}"
-              </div>
+              <EmptyState
+                icon="🔍"
+                title="No matches found"
+                description={`No notes contain "${searchQuery}". Try different keywords or check for typos.`}
+                actionButton={{
+                  label: "Clear Search",
+                  onClick: () => setSearchQuery(""),
+                  variant: "secondary"
+                }}
+                helpText="Use @person, #case, ~topic, +tag, or 'exact phrases' for better results. Try category:Notes or date filters like created:today."
+              />
             )}
             
             {filteredNotes.length === 0 && !searchQuery && (
-              <div className="text-center py-12 text-gray-500">
-                No notes yet. Create your first note above.
-              </div>
+              <EmptyState
+                icon="👋"
+                title="Welcome to Knowledge Hub"
+                description="Start capturing your thoughts, ideas, and knowledge by creating your first note. Use the input field above or click Capture to get started."
+                actionButton={{
+                  label: "Create First Note",
+                  onClick: startCapture
+                }}
+                helpText="Try using symbols like @person, #case, ~topic, and +tag to organize your notes automatically. For example: 'Meeting with @John about #ProjectX ~Planning +urgent'"
+              />
             )}
 
             {currentView === 'grid' ? (
@@ -4123,6 +4194,17 @@ export default function KnowledgePage() {
       <HelpModal 
         isOpen={isHelpModalOpen} 
         onClose={() => setIsHelpModalOpen(false)} 
+      />
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmationModal.isOpen}
+        onClose={closeConfirmationModal}
+        onConfirm={confirmationModal.onConfirm}
+        title={confirmationModal.title}
+        message={confirmationModal.message}
+        severity={confirmationModal.severity}
+        previewContent={confirmationModal.previewContent}
       />
     </div>
   );
