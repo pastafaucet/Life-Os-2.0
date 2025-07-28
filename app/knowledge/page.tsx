@@ -69,6 +69,14 @@ export default function KnowledgePage() {
   const [addingTagToNote, setAddingTagToNote] = useState<string | null>(null);
   const [newTagValue, setNewTagValue] = useState('');
   
+  // Inline adding state for different types
+  const [addingTopicToNote, setAddingTopicToNote] = useState<string | null>(null);
+  const [newTopicValue, setNewTopicValue] = useState('');
+  const [addingPersonToNote, setAddingPersonToNote] = useState<string | null>(null);
+  const [newPersonValue, setNewPersonValue] = useState('');
+  const [addingCaseToNote, setAddingCaseToNote] = useState<string | null>(null);
+  const [newCaseValue, setNewCaseValue] = useState('');
+  
   // Inline editing for other badges
   const [editingPerson, setEditingPerson] = useState<{ noteId: string; personId: string } | null>(null);
   const [editingPersonValue, setEditingPersonValue] = useState('');
@@ -769,6 +777,171 @@ export default function KnowledgePage() {
     } else if (e.key === 'Escape') {
       e.preventDefault();
       cancelAddingTag();
+    }
+  };
+
+  // Adding new topic functions
+  const startAddingTopic = (noteId: string) => {
+    setAddingTopicToNote(noteId);
+    setNewTopicValue('');
+  };
+
+  const saveNewTopic = () => {
+    if (!addingTopicToNote || !newTopicValue.trim()) {
+      cancelAddingTopic();
+      return;
+    }
+
+    // Check if topic already exists
+    let existingTopic = topics.find(t => t.name.toLowerCase() === newTopicValue.trim().toLowerCase());
+    let topicId: string;
+    
+    if (!existingTopic) {
+      // Create new topic
+      const newTopic = LocalStorage.createTopic({
+        name: newTopicValue.trim(),
+        description: `Created from note`,
+        color: 'orange'
+      });
+      topicId = newTopic.id;
+    } else {
+      topicId = existingTopic.id;
+    }
+
+    // Link topic to note
+    const note = notes.find(n => n.id === addingTopicToNote);
+    if (note && !note.linkedTopicIds.includes(topicId)) {
+      const updatedTopicIds = [...note.linkedTopicIds, topicId];
+      LocalStorage.updateNote(addingTopicToNote, { linkedTopicIds: updatedTopicIds });
+      loadData();
+    }
+    
+    setAddingTopicToNote(null);
+    setNewTopicValue('');
+  };
+
+  const cancelAddingTopic = () => {
+    setAddingTopicToNote(null);
+    setNewTopicValue('');
+  };
+
+  const handleNewTopicKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveNewTopic();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelAddingTopic();
+    }
+  };
+
+  // Adding new person functions
+  const startAddingPerson = (noteId: string) => {
+    setAddingPersonToNote(noteId);
+    setNewPersonValue('');
+  };
+
+  const saveNewPerson = () => {
+    if (!addingPersonToNote || !newPersonValue.trim()) {
+      cancelAddingPerson();
+      return;
+    }
+
+    // Check if person already exists
+    let existingPerson = people.find(p => p.name.toLowerCase() === newPersonValue.trim().toLowerCase());
+    let personId: string;
+    
+    if (!existingPerson) {
+      // Create new person
+      const newPerson = LocalStorage.createPerson({
+        name: newPersonValue.trim(),
+        email: '',
+        phone: '',
+        role: 'contact'
+      });
+      personId = newPerson.id;
+    } else {
+      personId = existingPerson.id;
+    }
+
+    // Link person to note
+    const note = notes.find(n => n.id === addingPersonToNote);
+    if (note && !note.linkedPersonIds.includes(personId)) {
+      const updatedPersonIds = [...note.linkedPersonIds, personId];
+      LocalStorage.updateNote(addingPersonToNote, { linkedPersonIds: updatedPersonIds });
+      loadData();
+    }
+    
+    setAddingPersonToNote(null);
+    setNewPersonValue('');
+  };
+
+  const cancelAddingPerson = () => {
+    setAddingPersonToNote(null);
+    setNewPersonValue('');
+  };
+
+  const handleNewPersonKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveNewPerson();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelAddingPerson();
+    }
+  };
+
+  // Adding new case functions
+  const startAddingCase = (noteId: string) => {
+    setAddingCaseToNote(noteId);
+    setNewCaseValue('');
+  };
+
+  const saveNewCase = () => {
+    if (!addingCaseToNote || !newCaseValue.trim()) {
+      cancelAddingCase();
+      return;
+    }
+
+    // Check if case already exists
+    let existingCase = cases.find(c => c.name.toLowerCase() === newCaseValue.trim().toLowerCase());
+    let caseId: string;
+    
+    if (!existingCase) {
+      // Create new case
+      const newCase = LocalStorage.createCase({
+        name: newCaseValue.trim(),
+        status: 'Active'
+      });
+      caseId = newCase.id;
+    } else {
+      caseId = existingCase.id;
+    }
+
+    // Link case to note
+    const note = notes.find(n => n.id === addingCaseToNote);
+    if (note && !note.linkedCaseIds.includes(caseId)) {
+      const updatedCaseIds = [...note.linkedCaseIds, caseId];
+      LocalStorage.updateNote(addingCaseToNote, { linkedCaseIds: updatedCaseIds });
+      loadData();
+    }
+    
+    setAddingCaseToNote(null);
+    setNewCaseValue('');
+  };
+
+  const cancelAddingCase = () => {
+    setAddingCaseToNote(null);
+    setNewCaseValue('');
+  };
+
+  const handleNewCaseKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveNewCase();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelAddingCase();
     }
   };
 
@@ -3290,6 +3463,115 @@ export default function KnowledgePage() {
                               </span>
                             )
                           ))}
+
+                          {/* Placeholder badges for empty fields - Grid View */}
+                          {linkedTopics.length === 0 && (
+                            addingTopicToNote === note.id ? (
+                              <input
+                                type="text"
+                                value={newTopicValue}
+                                onChange={(e) => setNewTopicValue(e.target.value)}
+                                onKeyDown={handleNewTopicKeyDown}
+                                onBlur={saveNewTopic}
+                                className="px-2 py-1 rounded-md text-xs bg-orange-500/40 text-orange-200 border border-orange-500/50 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                style={{ width: `${Math.max(newTopicValue.length * 8, 80)}px` }}
+                                placeholder="Topic name"
+                                autoFocus
+                              />
+                            ) : (
+                              <span 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startAddingTopic(note.id);
+                                }}
+                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-600/10 text-gray-500 border border-gray-600/20 cursor-pointer hover:bg-orange-500/10 hover:text-orange-400 hover:border-orange-500/30 transition-all"
+                                title="Click to add topic"
+                              >
+                                ~ Add Topic
+                              </span>
+                            )
+                          )}
+
+                          {linkedPeople.length === 0 && (
+                            addingPersonToNote === note.id ? (
+                              <input
+                                type="text"
+                                value={newPersonValue}
+                                onChange={(e) => setNewPersonValue(e.target.value)}
+                                onKeyDown={handleNewPersonKeyDown}
+                                onBlur={saveNewPerson}
+                                className="px-2 py-1 rounded-md text-xs bg-blue-500/40 text-blue-200 border border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                style={{ width: `${Math.max(newPersonValue.length * 8, 80)}px` }}
+                                placeholder="Person name"
+                                autoFocus
+                              />
+                            ) : (
+                              <span 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startAddingPerson(note.id);
+                                }}
+                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-600/10 text-gray-500 border border-gray-600/20 cursor-pointer hover:bg-blue-500/10 hover:text-blue-400 hover:border-blue-500/30 transition-all"
+                                title="Click to add person"
+                              >
+                                @ Add Person
+                              </span>
+                            )
+                          )}
+
+                          {linkedCases.length === 0 && (
+                            addingCaseToNote === note.id ? (
+                              <input
+                                type="text"
+                                value={newCaseValue}
+                                onChange={(e) => setNewCaseValue(e.target.value)}
+                                onKeyDown={handleNewCaseKeyDown}
+                                onBlur={saveNewCase}
+                                className="px-2 py-1 rounded-md text-xs bg-green-500/40 text-green-200 border border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-400"
+                                style={{ width: `${Math.max(newCaseValue.length * 8, 80)}px` }}
+                                placeholder="Case name"
+                                autoFocus
+                              />
+                            ) : (
+                              <span 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startAddingCase(note.id);
+                                }}
+                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-600/10 text-gray-500 border border-gray-600/20 cursor-pointer hover:bg-green-500/10 hover:text-green-400 hover:border-green-500/30 transition-all"
+                                title="Click to add case"
+                              >
+                                # Add Case
+                              </span>
+                            )
+                          )}
+
+                          {note.tags.length === 0 && (
+                            addingTagToNote === note.id ? (
+                              <input
+                                type="text"
+                                value={newTagValue}
+                                onChange={(e) => setNewTagValue(e.target.value)}
+                                onKeyDown={handleNewTagKeyDown}
+                                onBlur={saveNewTag}
+                                className="px-2 py-1 rounded-md text-xs bg-yellow-500/40 text-yellow-200 border border-yellow-500/50 focus:outline-none focus:ring-1 focus:ring-yellow-400"
+                                style={{ width: `${Math.max(newTagValue.length * 8, 80)}px` }}
+                                placeholder="Tag name"
+                                autoFocus
+                              />
+                            ) : (
+                              <span 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startAddingTag(note.id);
+                                }}
+                                className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-600/10 text-gray-500 border border-gray-600/20 cursor-pointer hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/30 transition-all"
+                                title="Click to add tag"
+                              >
+                                + Add Tag
+                              </span>
+                            )
+                          )}
                         </div>
                       </div>
 
@@ -3609,6 +3891,115 @@ export default function KnowledgePage() {
                                       </span>
                                     )
                                   ))}
+
+                                  {/* Placeholder badges for empty fields - List View */}
+                                  {linkedTopics.length === 0 && (
+                                    addingTopicToNote === note.id ? (
+                                      <input
+                                        type="text"
+                                        value={newTopicValue}
+                                        onChange={(e) => setNewTopicValue(e.target.value)}
+                                        onKeyDown={handleNewTopicKeyDown}
+                                        onBlur={saveNewTopic}
+                                        className="px-2 py-1 rounded-md text-xs bg-orange-500/40 text-orange-200 border border-orange-500/50 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                        style={{ width: `${Math.max(newTopicValue.length * 8, 80)}px` }}
+                                        placeholder="Topic name"
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <span 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          startAddingTopic(note.id);
+                                        }}
+                                        className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-600/10 text-gray-500 border border-gray-600/20 cursor-pointer hover:bg-orange-500/10 hover:text-orange-400 hover:border-orange-500/30 transition-all"
+                                        title="Click to add topic"
+                                      >
+                                        ~ Add Topic
+                                      </span>
+                                    )
+                                  )}
+
+                                  {linkedPeople.length === 0 && (
+                                    addingPersonToNote === note.id ? (
+                                      <input
+                                        type="text"
+                                        value={newPersonValue}
+                                        onChange={(e) => setNewPersonValue(e.target.value)}
+                                        onKeyDown={handleNewPersonKeyDown}
+                                        onBlur={saveNewPerson}
+                                        className="px-2 py-1 rounded-md text-xs bg-blue-500/40 text-blue-200 border border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                        style={{ width: `${Math.max(newPersonValue.length * 8, 80)}px` }}
+                                        placeholder="Person name"
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <span 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          startAddingPerson(note.id);
+                                        }}
+                                        className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-600/10 text-gray-500 border border-gray-600/20 cursor-pointer hover:bg-blue-500/10 hover:text-blue-400 hover:border-blue-500/30 transition-all"
+                                        title="Click to add person"
+                                      >
+                                        @ Add Person
+                                      </span>
+                                    )
+                                  )}
+
+                                  {linkedCases.length === 0 && (
+                                    addingCaseToNote === note.id ? (
+                                      <input
+                                        type="text"
+                                        value={newCaseValue}
+                                        onChange={(e) => setNewCaseValue(e.target.value)}
+                                        onKeyDown={handleNewCaseKeyDown}
+                                        onBlur={saveNewCase}
+                                        className="px-2 py-1 rounded-md text-xs bg-green-500/40 text-green-200 border border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-400"
+                                        style={{ width: `${Math.max(newCaseValue.length * 8, 80)}px` }}
+                                        placeholder="Case name"
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <span 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          startAddingCase(note.id);
+                                        }}
+                                        className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-600/10 text-gray-500 border border-gray-600/20 cursor-pointer hover:bg-green-500/10 hover:text-green-400 hover:border-green-500/30 transition-all"
+                                        title="Click to add case"
+                                      >
+                                        # Add Case
+                                      </span>
+                                    )
+                                  )}
+
+                                  {note.tags.length === 0 && (
+                                    addingTagToNote === note.id ? (
+                                      <input
+                                        type="text"
+                                        value={newTagValue}
+                                        onChange={(e) => setNewTagValue(e.target.value)}
+                                        onKeyDown={handleNewTagKeyDown}
+                                        onBlur={saveNewTag}
+                                        className="px-2 py-1 rounded-md text-xs bg-yellow-500/40 text-yellow-200 border border-yellow-500/50 focus:outline-none focus:ring-1 focus:ring-yellow-400"
+                                        style={{ width: `${Math.max(newTagValue.length * 8, 80)}px` }}
+                                        placeholder="Tag name"
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <span 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          startAddingTag(note.id);
+                                        }}
+                                        className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-600/10 text-gray-500 border border-gray-600/20 cursor-pointer hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/30 transition-all"
+                                        title="Click to add tag"
+                                      >
+                                        + Add Tag
+                                      </span>
+                                    )
+                                  )}
                                 </div>
                                 
                                 <span className="text-xs text-gray-500 flex-shrink-0 ml-4">
