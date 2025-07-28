@@ -3,9 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import Navigation from '../components/Navigation';
 import { LocalStorage } from '../../lib/storage/localStorage';
-import { Note, Category, Topic } from '../../lib/storage/types';
+import { Note, Category, Topic, SelectionState, BulkUpdateData, AIAnalysis } from '../../lib/storage/types';
 import { Brain, Plus, Search, Edit3, Trash2, Target, TrendingUp, Folder, Link, Save, X, Sparkles, Lightbulb, Zap } from 'lucide-react';
 import { analyzeNote, generateKnowledgeInsights } from '../../openai';
+import BulkOperationsBar from '../components/bulk/BulkOperationsBar';
+import SelectableNoteCard from '../components/SelectableNoteCard';
 
 export default function KnowledgePage() {
   const [notes, setNotes] = useState<Note[]>([]);

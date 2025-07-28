@@ -1,4 +1,4 @@
-import { Task, Case, Person, Note, Category, Topic, NoteLink, AppData } from './types';
+import { Task, Case, Person, Note, Category, Topic, NoteLink, AppData, BulkOperationResult, BulkUpdateData, AIAnalysis } from './types';
 
 const STORAGE_KEYS = {
   TASKS: 'lifeos-tasks',
@@ -556,6 +556,138 @@ export class LocalStorage {
       localStorage.removeItem(key);
     });
     localStorage.removeItem(STORAGE_KEYS.LAST_SYNC);
+  }
+
+  // Bulk Operations Methods
+  static bulkUpdateNotes(noteIds: string[], updates: BulkUpdateData): BulkOperationResult {
+    if (!this.isClient) {
+      return { success: false, processed: 0, failed: noteIds.length, errors: ['Client-side only operation'] };
+    }
+
+    const notes = this.getNotes();
+    const errors: string[] = [];
+    let processed = 0;
+
+    const updatedNotes = notes.map(note => {
+      if (!noteIds.includes(note.id)) return note;
+
+      try {
+        let updatedNote = { ...note };
+
+        // Update category
+        if (updates.categoryId) {
+          updatedNote.categoryId = updates.categoryId;
+        }
+
+        // Add tags
+        if (updates.tagsToAdd && updates.tagsToAdd.length > 0) {
+          const currentTags = new Set(updatedNote.tags);
+          updates.tagsToAdd.forEach(tag => currentTags.add(tag.trim()));
+          updatedNote.tags = Array.from(currentTags);
+        }
+
+        // Remove tags
+        if (updates.tagsToRemove && updates.tagsToRemove.length > 0) {
+          updatedNote.tags = updatedNote.tags.filter(tag => !updates.tagsToRemove!.includes(tag));
+        }
+
+        // Update status
+        if (updates.status) {
+          updatedNote.status = updates.status;
+        }
+
+        updatedNote.updatedAt = new Date().toISOString();
+        processed++;
+        return updatedNote;
+      } catch (error) {
+        errors.push(`Failed to update note ${note.id}: ${error}`);
+        return note;
+      }
+    });
+
+    this.saveNotes(updatedNotes);
+
+    return {
+      success: errors.length === 0,
+      processed,
+      failed: noteIds.length - processed,
+      errors
+    };
+  }
+
+  static bulkDeleteNotes(noteIds: string[]): BulkOperationResult {
+    if (!this.isClient) {
+      return { success: false, processed: 0, failed: noteIds.length, errors: ['Client-side only operation'] };
+    }
+
+    const notes = this.getNotes();
+    const initialCount = notes.length;
+    const filteredNotes = notes.filter(note => !noteIds.includes(note.id));
+    const processed = initialCount - filteredNotes.length;
+
+    this.saveNotes(filteredNotes);
+
+    return {
+      success: true,
+      processed,
+      failed: noteIds.length - processed,
+      errors: []
+    };
+  }
+
+  static getAvailableTags(): string[] {
+    const notes = this.getNotes();
+    const tagSet = new Set<string>();
+    
+    notes.forEach(note => {
+      note.tags.forEach(tag => tagSet.add(tag));
+    });
+
+    return Array.from(tagSet).sort();
+  }
+
+  static exportSelectedNotes(noteIds: string[]): { notes: Note[], linkedData: any } {
+    const notes = this.getNotes().filter(note => noteIds.includes(note.id));
+    const categories = this.getCategories();
+    const topics = this.getTopics();
+    const cases = this.getCases();
+    const people = this.getPeople();
+
+    return {
+      notes,
+      linkedData: {
+        categories,
+        topics,
+        cases,
+        people
+      }
+    };
+  }
+
+  // AI Analysis Storage
+  static saveAIAnalysis(analysis: AIAnalysis) {
+    if (!this.isClient) return;
+    
+    const analyses = this.getAIAnalyses();
+    const existingIndex = analyses.findIndex(a => a.noteId === analysis.noteId);
+    
+    if (existingIndex >= 0) {
+      analyses[existingIndex] = analysis;
+    } else {
+      analyses.push(analysis);
+    }
+    
+    localStorage.setItem('lifeos-ai-analyses', JSON.stringify(analyses));
+  }
+
+  static getAIAnalyses(): AIAnalysis[] {
+    if (!this.isClient) return [];
+    const data = localStorage.getItem('lifeos-ai-analyses');
+    return data ? JSON.parse(data) : [];
+  }
+
+  static getAIAnalysis(noteId: string): AIAnalysis | undefined {
+    return this.getAIAnalyses().find(a => a.noteId === noteId);
   }
 
   // Sample data for development

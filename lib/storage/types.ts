@@ -125,3 +125,35 @@ export interface ParsedTask {
   personName?: string;
   timeEstimate?: string;
 }
+
+// Bulk Operations Types
+export interface BulkOperationResult {
+  success: boolean;
+  processed: number;
+  failed: number;
+  errors: string[];
+}
+
+export interface BulkUpdateData {
+  categoryId?: string;
+  tagsToAdd?: string[];
+  tagsToRemove?: string[];
+  status?: Note['status'];
+}
+
+export interface SelectionState {
+  selectedNoteIds: Set<string>;
+  isSelectable: boolean;
+  lastSelectedId: string | null;
+}
+
+// AI Analysis Types
+export interface AIAnalysis {
+  noteId: string;
+  summary: string;
+  suggestedCategory: string;
+  keyTopics: string[];
+  relevanceScore: number;
+  insights: string[];
+  generatedAt: string;
+}
