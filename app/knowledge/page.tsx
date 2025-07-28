@@ -2039,7 +2039,7 @@ export default function KnowledgePage() {
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && createNote()}
-              placeholder="Quick note title (press Enter to create)..."
+              placeholder="Call with @John re mediation prep #Cullors ~Mediation +followup"
               className="w-full px-4 py-3 bg-gray-900/50 border border-gray-800/50 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-gray-700 transition-all placeholder-gray-500 text-white note-input"
             />
           </div>
