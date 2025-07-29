@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Edit3, Trash2, Sparkles } from 'lucide-react';
+import { Edit3, Trash2, Sparkles, Star } from 'lucide-react';
 import { Note, Category, Topic } from '../../lib/storage/types';
 
 interface SelectableNoteCardProps {
@@ -31,6 +31,7 @@ interface SelectableNoteCardProps {
   onEditPerson: (noteId: string, personId: string, currentValue: string) => void;
   onEditCase: (noteId: string, caseId: string, currentValue: string) => void;
   onEditTopic: (noteId: string, topicId: string, currentValue: string) => void;
+  onToggleFavorite: (noteId: string) => void;
 }
 
 export default function SelectableNoteCard({
@@ -53,7 +54,8 @@ export default function SelectableNoteCard({
   onEditTag,
   onEditPerson,
   onEditCase,
-  onEditTopic
+  onEditTopic,
+  onToggleFavorite
 }: SelectableNoteCardProps) {
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't trigger if clicking on interactive elements
@@ -241,6 +243,24 @@ export default function SelectableNoteCard({
         
         {/* Action Buttons */}
         <div className={`flex items-center space-x-2 ml-4 ${isSelectable ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+          {/* Favorite Star */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite(note.id);
+            }}
+            className={`p-2 rounded-lg transition-all ${
+              note.isFavorite 
+                ? 'text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10' 
+                : 'text-gray-500 hover:text-yellow-400 hover:bg-yellow-500/10'
+            }`}
+            title={note.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            <Star 
+              className={`h-4 w-4 ${note.isFavorite ? 'fill-current' : ''}`} 
+            />
+          </button>
+
           <button
             onClick={(e) => {
               e.stopPropagation();

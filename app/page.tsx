@@ -194,7 +194,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <Navigation />
       
-      <div className="max-w-[1400px] mx-auto px-6 py-8">
+      <div className="px-6 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent mb-2">

@@ -58,6 +58,7 @@ export interface Note {
   
   tags: string[]; // Secondary organization
   status: 'inbox' | 'active' | 'done' | 'archived'; // Updated workflow: inbox → active → done → archived
+  isFavorite: boolean; // NEW: Favorites system
   createdAt: string;
   updatedAt: string;
 }

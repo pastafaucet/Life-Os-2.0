@@ -5,7 +5,7 @@ import Navigation from '../components/Navigation';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { LocalStorage } from '../../lib/storage/localStorage';
 import { Note, Category, Topic, SelectionState, BulkUpdateData, AIAnalysis } from '../../lib/storage/types';
-import { Brain, Plus, Search, Edit3, Trash2, Target, TrendingUp, Folder, Link, Save, X, Sparkles, Lightbulb, Zap, HelpCircle } from 'lucide-react';
+import { Brain, Plus, Search, Edit3, Trash2, Target, TrendingUp, Folder, Link, Save, X, Sparkles, Lightbulb, Zap, HelpCircle, Star } from 'lucide-react';
 import { analyzeNote, generateKnowledgeInsights } from '../../openai';
 import BulkOperationsBar from '../components/bulk/BulkOperationsBar';
 import SelectableNoteCard from '../components/SelectableNoteCard';
@@ -105,7 +105,7 @@ export default function KnowledgePage() {
   const [showingAIAnalysis, setShowingAIAnalysis] = useState<string | null>(null);
 
   // View state
-  const [currentView, setCurrentView] = useState<'grid' | 'list' | 'categories' | 'topics' | 'ai-insights' | 'category-detail' | 'topic-detail'>('list');
+  const [currentView, setCurrentView] = useState<'grid' | 'list' | 'favorites' | 'categories' | 'topics' | 'ai-insights' | 'category-detail' | 'topic-detail'>('list');
   
   // Detail view state
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -169,6 +169,10 @@ export default function KnowledgePage() {
     onConfirm: () => {}
   });
 
+  // Favorites state
+  const [favoriteNoteIds, setFavoriteNoteIds] = useState<Set<string>>(new Set());
+  const [favoritesWarningDismissed, setFavoritesWarningDismissed] = useState(false);
+
   useEffect(() => {
     LocalStorage.initialize();
     
@@ -182,6 +186,12 @@ export default function KnowledgePage() {
     const savedHistory = localStorage.getItem('knowledgeHub_searchHistory');
     if (savedHistory) {
       setSearchHistory(JSON.parse(savedHistory));
+    }
+    
+    // Load favorites warning dismissed state
+    const warningDismissed = localStorage.getItem('knowledgeHub_favoritesWarningDismissed');
+    if (warningDismissed === 'true') {
+      setFavoritesWarningDismissed(true);
     }
   }, []);
 
@@ -229,6 +239,47 @@ export default function KnowledgePage() {
       updatedAt: new Date().toISOString()
     });
     setProcessedNoteIds(prev => new Set([...prev, noteId]));
+    loadData();
+  };
+
+  // Toggle note favorite status
+  const toggleNoteFavorite = (noteId: string) => {
+    const note = notes.find(n => n.id === noteId);
+    if (!note) return;
+
+    const newFavoriteStatus = !note.isFavorite;
+    
+    // Check for 10+ favorites warning (only when adding to favorites)
+    if (newFavoriteStatus && !favoritesWarningDismissed) {
+      const currentFavoriteCount = notes.filter(n => n.isFavorite).length;
+      if (currentFavoriteCount >= 10) {
+        const shouldContinue = window.confirm(
+          "You have 10+ favorites. Consider organizing them into categories or topics for better management.\n\nContinue adding to favorites?"
+        );
+        if (!shouldContinue) return;
+        
+        // Mark warning as dismissed
+        setFavoritesWarningDismissed(true);
+        localStorage.setItem('knowledgeHub_favoritesWarningDismissed', 'true');
+      }
+    }
+
+    // Update the note's favorite status
+    LocalStorage.updateNote(noteId, { 
+      isFavorite: newFavoriteStatus,
+      updatedAt: new Date().toISOString()
+    });
+
+    // Update favorites set in state
+    const newFavoriteNoteIds = new Set(favoriteNoteIds);
+    if (newFavoriteStatus) {
+      newFavoriteNoteIds.add(noteId);
+    } else {
+      newFavoriteNoteIds.delete(noteId);
+    }
+    setFavoriteNoteIds(newFavoriteNoteIds);
+
+    // Reload data to reflect changes
     loadData();
   };
 
@@ -1263,6 +1314,11 @@ export default function KnowledgePage() {
 
   // Advanced filtering logic with Phase 2 features
   const filteredNotes = notes.filter(note => {
+    // Favorites view filter - only show favorited notes
+    if (currentView === 'favorites' && !note.isFavorite) {
+      return false;
+    }
+    
     // Enhanced text search with advanced features
     if (debouncedSearchQuery) {
       const query = debouncedSearchQuery.trim();
@@ -2589,7 +2645,7 @@ export default function KnowledgePage() {
         </div>
       )}
       
-      <div className="max-w-[1400px] mx-auto px-6 py-8">
+      <div className="px-6 py-8">
         {/* Compact Header with Stats */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
@@ -2814,6 +2870,22 @@ export default function KnowledgePage() {
             >
               <span>⊞</span>
               <span>Grid View</span>
+            </button>
+            <button
+              onClick={() => setCurrentView('favorites')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${
+                currentView === 'favorites' 
+                  ? 'bg-purple-500 text-white' 
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+              }`}
+            >
+              <span>⭐</span>
+              <span>Favorites</span>
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                currentView === 'favorites' ? 'bg-white/20' : 'bg-gray-700'
+              }`}>
+                {notes.filter(note => note.isFavorite).length}
+              </span>
             </button>
             <button
               onClick={() => setCurrentView('categories')}
@@ -3358,7 +3430,7 @@ export default function KnowledgePage() {
           </div>
         )}
 
-        {(currentView === 'list' || currentView === 'grid') && (
+        {(currentView === 'list' || currentView === 'grid' || currentView === 'favorites') && (
           <div>
             {filteredNotes.length === 0 && searchQuery && (
               <EmptyState
@@ -3374,7 +3446,21 @@ export default function KnowledgePage() {
               />
             )}
             
-            {filteredNotes.length === 0 && !searchQuery && (
+            {filteredNotes.length === 0 && !searchQuery && currentView === 'favorites' && (
+              <EmptyState
+                icon="⭐"
+                title="No favorites yet"
+                description="Star some notes to add them to your favorites. Click the star button on any note to mark it as a favorite."
+                actionButton={{
+                  label: "View All Notes",
+                  onClick: () => setCurrentView('list'),
+                  variant: "secondary"
+                }}
+                helpText="Favorites help you quickly access your most important notes. You can favorite up to 10 notes before getting a organization reminder."
+              />
+            )}
+            
+            {filteredNotes.length === 0 && !searchQuery && currentView !== 'favorites' && (
               <EmptyState
                 icon="👋"
                 title="Welcome to Knowledge Hub"
@@ -3423,6 +3509,21 @@ export default function KnowledgePage() {
                       {/* Content Section - Compact badges like list view */}
                       <div className="flex-1">
                         <div className="flex flex-wrap gap-1 mb-3">
+                          {/* Star Badge - First Badge */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleNoteFavorite(note.id);
+                            }}
+                            className={`inline-flex items-center px-2 py-1 rounded-md text-xs border transition-all cursor-pointer hover:scale-105 ${
+                              note.isFavorite 
+                                ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30 hover:bg-yellow-500/30' 
+                                : 'bg-gray-600/10 text-gray-500 border-gray-600/20 hover:bg-gray-600/20 hover:text-gray-400'
+                            }`}
+                            title={note.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                          >
+                            <Star className={`h-3 w-3 ${note.isFavorite ? 'fill-current' : ''}`} />
+                          </button>
                           {linkedTopics.map(topic => (
                             editingTopic?.noteId === note.id && editingTopic?.topicId === topic.id ? (
                               <input
@@ -3679,6 +3780,20 @@ export default function KnowledgePage() {
                           <button 
                             onClick={(e) => {
                               e.stopPropagation();
+                              toggleNoteFavorite(note.id);
+                            }}
+                            className={`p-2 rounded-lg transition-colors ${
+                              note.isFavorite 
+                                ? 'text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10' 
+                                : 'text-gray-500 hover:text-yellow-400 hover:bg-yellow-500/10'
+                            }`}
+                            title={note.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                          >
+                            <Star className={`h-4 w-4 ${note.isFavorite ? 'fill-current' : ''}`} />
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
                               startEditing(note);
                             }}
                             className="p-2 text-gray-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
@@ -3792,48 +3907,43 @@ export default function KnowledgePage() {
                               <div className="flex items-center mb-2">
                                 <h3 className="text-lg font-medium text-white mr-2">{note.title}</h3>
                                 
-                                {/* Inbox Processing Action Buttons - Right after title */}
-                                {note.status === 'inbox' && (
-                                  <div className="flex items-center space-x-1 ml-2">
-                                    <button 
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        moveNoteToStatus(note.id, 'active');
-                                      }}
-                                      className="p-1 text-gray-500 hover:text-blue-400 hover:bg-blue-500/10 rounded transition-all text-sm"
-                                      title="Move to Active"
-                                    >
-                                      🔄
-                                    </button>
-                                    <button 
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        moveNoteToStatus(note.id, 'done');
-                                      }}
-                                      className="p-1 text-gray-500 hover:text-green-400 hover:bg-green-500/10 rounded transition-all text-sm"
-                                      title="Mark as Done"
-                                    >
-                                      ✅
-                                    </button>
-                                    <button 
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        moveNoteToStatus(note.id, 'archived');
-                                      }}
-                                      className="p-1 text-gray-500 hover:text-purple-400 hover:bg-purple-500/10 rounded transition-all text-sm"
-                                      title="Archive"
-                                    >
-                                      📦
-                                    </button>
-                                  </div>
-                                )}
+                                {/* Status Badge - Clickable to cycle status */}
+                                <span 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    cycleStatusForNote(note.id);
+                                  }}
+                                  className={`inline-flex items-center px-2 py-1 rounded-md text-xs border cursor-pointer transition-all group/status hover:scale-105 ${
+                                    getStatusStyle(note.status).bg
+                                  } ${
+                                    getStatusStyle(note.status).text
+                                  } ${
+                                    getStatusStyle(note.status).border
+                                  }`}
+                                  title="Click to cycle status"
+                                >
+                                  {getStatusStyle(note.status).icon} {note.status}
+                                  <span className="ml-1 opacity-0 group-hover/status:opacity-100 transition-opacity text-xs">↻</span>
+                                </span>
                               </div>
 
                               <div className="flex justify-between items-start">
                                 <div className="flex items-center space-x-2 flex-wrap gap-2">
+                                  {/* Star Badge - First Badge */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleNoteFavorite(note.id);
+                                    }}
+                                    className={`inline-flex items-center px-2 py-1 rounded-md text-xs border transition-all cursor-pointer hover:scale-105 ${
+                                      note.isFavorite 
+                                        ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30 hover:bg-yellow-500/30' 
+                                        : 'bg-gray-600/10 text-gray-500 border-gray-600/20 hover:bg-gray-600/20 hover:text-gray-400'
+                                    }`}
+                                    title={note.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                                  >
+                                    <Star className={`h-3 w-3 ${note.isFavorite ? 'fill-current' : ''}`} />
+                                  </button>
                                   {category && (
                                     <span 
                                       onClick={(e) => {

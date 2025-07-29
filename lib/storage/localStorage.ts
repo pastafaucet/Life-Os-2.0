@@ -33,6 +33,9 @@ export class LocalStorage {
 
     // Migrate existing notes to ensure they have status field
     this.migrateNotesToIncludeStatus();
+    
+    // Migrate existing notes to ensure they have isFavorite field
+    this.migrateNotesToIncludeFavorites();
   }
 
   // Migrate existing notes to ensure they have status field
@@ -60,6 +63,34 @@ export class LocalStorage {
       }
     } catch (error) {
       console.error('Error migrating notes:', error);
+    }
+  }
+
+  // Migrate existing notes to ensure they have isFavorite field
+  static migrateNotesToIncludeFavorites() {
+    if (!this.isClient) return;
+    
+    try {
+      const notes = JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTES) || '[]');
+      let needsMigration = false;
+      
+      const migratedNotes = notes.map((note: any) => {
+        if (note.isFavorite === undefined) {
+          needsMigration = true;
+          return {
+            ...note,
+            isFavorite: false // Default to not favorited for existing notes
+          };
+        }
+        return note;
+      });
+      
+      if (needsMigration) {
+        localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(migratedNotes));
+        console.log('Migrated notes to include isFavorite field');
+      }
+    } catch (error) {
+      console.error('Error migrating notes for favorites:', error);
     }
   }
 
@@ -277,6 +308,7 @@ export class LocalStorage {
       linkedNoteIds: noteData.linkedNoteIds || [],
       tags: noteData.tags || [],
       status: noteData.status || 'inbox', // Default to inbox for new workflow
+      isFavorite: noteData.isFavorite || false, // Default to not favorited
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       ...noteData
@@ -313,6 +345,58 @@ export class LocalStorage {
       return true;
     }
     return false;
+  }
+
+  // Favorites Methods
+  static toggleNoteFavorite(id: string): { success: boolean; isFavorite: boolean; favoritesCount: number; warning?: string } {
+    const notes = this.getNotes();
+    const noteIndex = notes.findIndex(note => note.id === id);
+    
+    if (noteIndex === -1) {
+      return { success: false, isFavorite: false, favoritesCount: 0 };
+    }
+
+    const currentNote = notes[noteIndex];
+    const newFavoriteStatus = !currentNote.isFavorite;
+    
+    // Check if trying to favorite and already have 10+ favorites
+    if (newFavoriteStatus) {
+      const currentFavoritesCount = notes.filter(note => note.isFavorite).length;
+      if (currentFavoritesCount >= 10) {
+        return { 
+          success: false, 
+          isFavorite: false, 
+          favoritesCount: currentFavoritesCount,
+          warning: "You can only have up to 10 favorites. Please unfavorite some notes first."
+        };
+      }
+    }
+
+    // Update the note
+    const updatedNote = {
+      ...currentNote,
+      isFavorite: newFavoriteStatus,
+      updatedAt: new Date().toISOString()
+    };
+
+    notes[noteIndex] = updatedNote;
+    this.saveNotes(notes);
+
+    const newFavoritesCount = notes.filter(note => note.isFavorite).length;
+    
+    return { 
+      success: true, 
+      isFavorite: newFavoriteStatus, 
+      favoritesCount: newFavoritesCount 
+    };
+  }
+
+  static getFavoriteNotes(): Note[] {
+    return this.getNotes().filter(note => note.isFavorite);
+  }
+
+  static getFavoritesCount(): number {
+    return this.getNotes().filter(note => note.isFavorite).length;
   }
 
   // Categories

@@ -787,7 +787,7 @@ export default function TaskDashboard() {
     <div className="min-h-screen bg-gray-950 text-gray-100">
       {/* Task Management Header */}
       <div className="border-b border-gray-800/50 backdrop-blur-xl bg-gray-900/50 sticky top-16 z-30">
-        <div className="max-w-[1400px] mx-auto px-6">
+        <div className="px-6">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center space-x-3">
               <h1 className="text-lg font-semibold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">Task Management</h1>
@@ -863,7 +863,7 @@ export default function TaskDashboard() {
       )}
 
       {/* Main Content */}
-      <div className="max-w-[1400px] mx-auto px-6 py-8">
+      <div className="px-6 py-8">
         {/* View Navigation */}
         <div className="mb-8">
           <div className="flex items-center space-x-1 mb-4">

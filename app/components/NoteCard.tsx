@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Note, Case, Person } from '../../lib/storage/types';
-import { Calendar, User, Briefcase, Tag, MoreHorizontal } from 'lucide-react';
+import { Calendar, User, Briefcase, Tag, MoreHorizontal, Star } from 'lucide-react';
 
 interface NoteCardProps {
   note: Note;
@@ -10,9 +10,10 @@ interface NoteCardProps {
   people: Person[];
   onEdit: (note: Note) => void;
   onDelete: (noteId: string) => void;
+  onToggleFavorite: (noteId: string) => void;
 }
 
-export default function NoteCard({ note, cases, people, onEdit, onDelete }: NoteCardProps) {
+export default function NoteCard({ note, cases, people, onEdit, onDelete, onToggleFavorite }: NoteCardProps) {
   // Get linked case names
   const linkedCaseNames = note.linkedCaseIds
     .map(caseId => cases.find(c => c.id === caseId)?.name)
@@ -29,10 +30,9 @@ export default function NoteCard({ note, cases, people, onEdit, onDelete }: Note
     return plainText.length > 150 ? plainText.substring(0, 150) + '...' : plainText;
   };
 
-  const priorityColors = {
-    low: 'text-gray-400',
-    medium: 'text-yellow-400',
-    high: 'text-red-400'
+  const handleStarClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleFavorite(note.id);
   };
 
   return (
@@ -40,16 +40,29 @@ export default function NoteCard({ note, cases, people, onEdit, onDelete }: Note
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
-          <h3 
-            className="font-medium text-white text-lg hover:text-gray-300 transition-colors cursor-pointer"
-            onClick={() => onEdit(note)}
-          >
-            {note.title}
-          </h3>
+          <div className="flex items-center space-x-2">
+            <h3 
+              className="font-medium text-white text-lg hover:text-gray-300 transition-colors cursor-pointer flex-1"
+              onClick={() => onEdit(note)}
+            >
+              {note.title}
+            </h3>
+            {/* Favorite Star */}
+            <button
+              onClick={handleStarClick}
+              className={`p-1 rounded transition-all ${
+                note.isFavorite 
+                  ? 'text-yellow-400 hover:text-yellow-300' 
+                  : 'text-gray-500 hover:text-yellow-400'
+              }`}
+              title={note.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+            >
+              <Star 
+                className={`h-4 w-4 ${note.isFavorite ? 'fill-current' : ''}`} 
+              />
+            </button>
+          </div>
           <div className="flex items-center space-x-2 mt-1">
-            <span className={`text-xs font-medium ${priorityColors[note.priority]}`}>
-              {note.priority.toUpperCase()}
-            </span>
             <span className="text-xs text-gray-500">
               {new Date(note.updatedAt).toLocaleDateString()}
             </span>
